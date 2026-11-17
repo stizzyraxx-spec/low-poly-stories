@@ -99,12 +99,6 @@
   }
   #caption.atheist .who { color: var(--cold); }
   #caption.pastor  .who { color: var(--amber); }
-  #caption.narr {
-    font-style: italic;
-    color: var(--bone-dim);
-    font-size: clamp(0.92rem, 2.9vw, 1.12rem);
-  }
-  #caption.narr .who { display: none; }
 
   /* ---- Transport ---- */
   #bar {
@@ -1004,11 +998,15 @@
   var capLine = capEl.querySelector(".line");
   var NAMES = { a: "The Atheist", p: "The Pastor", n: "" };
 
+  // Narration is carried by the voice track alone - only spoken lines get a
+  // subtitle, so the stage directions never appear on screen.
+  function hasCaption(b) { return !!(b && b.text && b.spk !== "n"); }
+
   function showBeat(i) {
     var b = BEATS[i];
     if (!b) return;
-    if (!b.text) { capEl.classList.remove("on"); return; }
-    capEl.className = "on " + (b.spk === "a" ? "atheist" : b.spk === "p" ? "pastor" : "narr");
+    if (!hasCaption(b)) { capEl.classList.remove("on"); return; }
+    capEl.className = "on " + (b.spk === "a" ? "atheist" : "pastor");
     capWho.textContent = NAMES[b.spk];
     capLine.textContent = b.text;
   }
@@ -1433,34 +1431,31 @@
 
     // caption, drawn to match the on-page subtitle band
     var b = BEATS[beatIdx];
-    var visible = b && b.text && time >= b.t && time <= b.t + b.d + 0.25;
+    var visible = hasCaption(b) && time >= b.t && time <= b.t + b.d + 0.25;
     if (visible) {
       var scale = H / 720;
       var bodySize = Math.round(25 * scale);
-      var isNarr = b.spk === "n";
       var maxW = Math.min(W * 0.76, 760 * scale);
 
       _cx.textAlign = "center";
       _cx.textBaseline = "alphabetic";
-      _cx.font = (isNarr ? "italic " : "") + bodySize + 'px Bitter, Georgia, serif';
+      _cx.font = bodySize + 'px Bitter, Georgia, serif';
       var lines = wrapText(_cx, b.text, maxW);
       var lineH = bodySize * 1.42;
       var baseY = H - Math.round(84 * scale) - (lines.length - 1) * lineH;
 
-      if (!isNarr) {
-        var who = b.spk === "a" ? "THE ATHEIST" : "THE PASTOR";
-        var lblSize = Math.round(11 * scale);
-        _cx.font = "600 " + lblSize + 'px Archivo, Arial, sans-serif';
-        _cx.letterSpacing = Math.round(3 * scale) + "px";
-        _cx.fillStyle = b.spk === "a" ? "rgba(111,144,196,0.72)" : "rgba(232,162,76,0.72)";
-        _cx.shadowColor = "rgba(0,0,0,0.95)";
-        _cx.shadowBlur = 10 * scale;
-        _cx.fillText(who, W / 2, baseY - lineH - Math.round(13 * scale));
-        _cx.letterSpacing = "0px";
-      }
+      var who = b.spk === "a" ? "THE ATHEIST" : "THE PASTOR";
+      var lblSize = Math.round(11 * scale);
+      _cx.font = "600 " + lblSize + 'px Archivo, Arial, sans-serif';
+      _cx.letterSpacing = Math.round(3 * scale) + "px";
+      _cx.fillStyle = b.spk === "a" ? "rgba(111,144,196,0.72)" : "rgba(232,162,76,0.72)";
+      _cx.shadowColor = "rgba(0,0,0,0.95)";
+      _cx.shadowBlur = 10 * scale;
+      _cx.fillText(who, W / 2, baseY - lineH - Math.round(13 * scale));
+      _cx.letterSpacing = "0px";
 
-      _cx.font = (isNarr ? "italic " : "") + bodySize + 'px Bitter, Georgia, serif';
-      _cx.fillStyle = isNarr ? "rgba(154,145,137,1)" : "rgba(239,230,220,1)";
+      _cx.font = bodySize + 'px Bitter, Georgia, serif';
+      _cx.fillStyle = "rgba(239,230,220,1)";
       _cx.shadowColor = "rgba(0,0,0,0.95)";
       _cx.shadowBlur = 18 * scale;
       for (var i = 0; i < lines.length; i++) {
@@ -1564,8 +1559,9 @@
   voice.addEventListener("canplaythrough", audioIsReady);
   voice.addEventListener("loadeddata", audioIsReady);
   voice.addEventListener("error", function () {
-    // Narration failed: still let the film play, captions carry it.
-    loadingEl.textContent = "Narration unavailable \u2014 playing with captions";
+    // Narration failed: still let the film play. Only dialogue is subtitled,
+    // so without the voice track the stage directions are lost - say so.
+    loadingEl.textContent = "Narration unavailable \u2014 playing with dialogue subtitles only";
     playBtn.disabled = false;
     playBtn.style.opacity = "";
   });

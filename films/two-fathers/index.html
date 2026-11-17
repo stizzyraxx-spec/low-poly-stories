@@ -99,12 +99,6 @@
   }
   #caption.atheist .who { color: var(--cold); }
   #caption.pastor  .who { color: var(--amber); }
-  #caption.narr {
-    font-style: italic;
-    color: var(--bone-dim);
-    font-size: clamp(0.92rem, 2.9vw, 1.12rem);
-  }
-  #caption.narr .who { display: none; }
 
   /* ---- Transport ---- */
   #bar {
@@ -292,7 +286,7 @@
 
 <div id="title">
   <h1><em>A short film</em>Two Fathers</h1>
-  <p>An atheist and a pastor at closing time. Four minutes and forty-four seconds, narrated &mdash; best with sound on.</p>
+  <p>An atheist and a pastor at closing time. Four minutes and forty-four seconds, narrated &mdash; sound on, the voice carries the story.</p>
   <button class="btn" id="play">Begin</button>
   <span id="loading">Loading narration&hellip;</span>
   <a class="get" href="https://github.com/stizzyraxx-spec/low-poly-stories/releases/latest" target="_blank" rel="noopener">Download the MP4 &mdash; 43 MB</a>
@@ -1019,11 +1013,15 @@
   var capLine = capEl.querySelector(".line");
   var NAMES = { a: "The Atheist", p: "The Pastor", n: "" };
 
+  // Narration is carried by the voice track alone - only spoken lines get a
+  // subtitle, so the stage directions never appear on screen.
+  function hasCaption(b) { return !!(b && b.text && b.spk !== "n"); }
+
   function showBeat(i) {
     var b = BEATS[i];
     if (!b) return;
-    if (!b.text) { capEl.classList.remove("on"); return; }
-    capEl.className = "on " + (b.spk === "a" ? "atheist" : b.spk === "p" ? "pastor" : "narr");
+    if (!hasCaption(b)) { capEl.classList.remove("on"); return; }
+    capEl.className = "on " + (b.spk === "a" ? "atheist" : "pastor");
     capWho.textContent = NAMES[b.spk];
     capLine.textContent = b.text;
   }
@@ -1381,8 +1379,8 @@
       }
       // hide a caption once its beat has run out
       var cb = BEATS[beatIdx];
-      if (cb && cb.text && time > cb.t + cb.d + 0.25) capEl.classList.remove("on");
-      else if (cb && cb.text) capEl.classList.add("on");
+      if (hasCaption(cb) && time > cb.t + cb.d + 0.25) capEl.classList.remove("on");
+      else if (hasCaption(cb)) capEl.classList.add("on");
     }
 
     // The scene animates whether or not the film is advancing: pausing
@@ -1479,8 +1477,9 @@
   voice.addEventListener("canplaythrough", audioIsReady);
   voice.addEventListener("loadeddata", audioIsReady);
   voice.addEventListener("error", function () {
-    // Narration failed: still let the film play, captions carry it.
-    loadingEl.textContent = "Narration unavailable \u2014 playing with captions";
+    // Narration failed: still let the film play. Only dialogue is subtitled,
+    // so without the voice track the stage directions are lost - say so.
+    loadingEl.textContent = "Narration unavailable \u2014 playing with dialogue subtitles only";
     playBtn.disabled = false;
     playBtn.style.opacity = "";
   });
