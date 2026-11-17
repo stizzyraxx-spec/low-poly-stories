@@ -1,0 +1,682 @@
+[
+{
+"spk": "n",
+"text": "An atheist and a pastor walk into a bar.",
+"t": 2.98,
+"end": 5.23,
+"nseg": 1,
+"d": 2.25
+},
+{
+"spk": "n",
+"text": "The atheist orders whiskey. The pastor orders water.",
+"t": 5.69,
+"end": 7.1,
+"nseg": 1,
+"d": 1.41
+},
+{
+"spk": "n",
+"text": "The atheist laughs.",
+"t": 7.54,
+"end": 8.82,
+"nseg": 1,
+"d": 1.28
+},
+{
+"spk": "a",
+"text": "You know, for a man who believes in eternal life, you sure seem afraid to enjoy this one.",
+"t": 9.33,
+"end": 15.42,
+"nseg": 3,
+"d": 6.09
+},
+{
+"spk": "n",
+"text": "The pastor smiles.",
+"t": 15.99,
+"end": 17.04,
+"nseg": 1,
+"d": 1.05
+},
+{
+"spk": "p",
+"text": "And for a man who believes this life is all there is, you sure seem determined to forget it.",
+"t": 17.48,
+"end": 24.27,
+"nseg": 3,
+"d": 6.79
+},
+{
+"spk": "n",
+"text": "The atheist stops laughing.",
+"t": 24.79,
+"end": 27.16,
+"nseg": 1,
+"d": 2.37
+},
+{
+"spk": "n",
+"text": "After a moment, he asks the pastor a question.",
+"t": 27.78,
+"end": 29.04,
+"nseg": 1,
+"d": 1.26
+},
+{
+"spk": "a",
+"text": "If your God is so good, why does He allow innocent children to suffer?",
+"t": 29.5,
+"end": 34.11,
+"nseg": 2,
+"d": 4.61
+},
+{
+"spk": "n",
+"text": "The pastor looks down at his glass.",
+"t": 34.72,
+"end": 36.51,
+"nseg": 1,
+"d": 1.79
+},
+{
+"spk": "p",
+"text": "I don't know why every child suffers.",
+"t": 37.19,
+"end": 38.24,
+"nseg": 1,
+"d": 1.05
+},
+{
+"spk": "n",
+"text": "The atheist smirks.",
+"t": 38.81,
+"end": 40.2,
+"nseg": 1,
+"d": 1.39
+},
+{
+"spk": "a",
+"text": "That's the problem with religion. You always have an answer until the question becomes difficult.",
+"t": 40.88,
+"end": 45.5,
+"nseg": 2,
+"d": 4.62
+},
+{
+"spk": "n",
+"text": "The pastor replies.",
+"t": 46.0,
+"end": 46.33,
+"nseg": 1,
+"d": 0.33
+},
+{
+"spk": "p",
+"text": "No. The problem with some religious people is that they pretend faith means having every answer.",
+"t": 47.29,
+"end": 53.85,
+"nseg": 3,
+"d": 6.56
+},
+{
+"spk": "n",
+"text": "The atheist takes another drink.",
+"t": 54.53,
+"end": 56.35,
+"nseg": 1,
+"d": 1.82
+},
+{
+"spk": "a",
+"text": "Then tell me what faith actually is.",
+"t": 57.2,
+"end": 58.53,
+"nseg": 1,
+"d": 1.33
+},
+{
+"spk": "n",
+"text": "The pastor thinks for a moment.",
+"t": 59.24,
+"end": 61.74,
+"nseg": 1,
+"d": 2.5
+},
+{
+"spk": "p",
+"text": "Faith is not pretending the darkness doesn't exist. It's believing the darkness doesn't have the final word.",
+"t": 62.29,
+"end": 68.05,
+"nseg": 3,
+"d": 5.76
+},
+{
+"spk": "n",
+"text": "The atheist shakes his head.",
+"t": 68.81,
+"end": 70.44,
+"nseg": 1,
+"d": 1.63
+},
+{
+"spk": "a",
+"text": "That's beautiful. But beauty doesn't make something true.",
+"t": 71.17,
+"end": 72.14,
+"nseg": 1,
+"d": 0.97
+},
+{
+"spk": "n",
+"text": "The pastor nods.",
+"t": 72.93,
+"end": 73.25,
+"nseg": 1,
+"d": 0.32
+},
+{
+"spk": "p",
+"text": "You're right.",
+"t": 74.07,
+"end": 75.0,
+"nseg": 1,
+"d": 0.93
+},
+{
+"spk": "n",
+"text": "For the first time, the atheist looks surprised.",
+"t": 75.54,
+"end": 76.87,
+"nseg": 1,
+"d": 1.33
+},
+{
+"spk": "n",
+"text": "The pastor continues.",
+"t": 77.65,
+"end": 78.81,
+"nseg": 1,
+"d": 1.16
+},
+{
+"spk": "p",
+"text": "And pain doesn't make something false.",
+"t": 79.48,
+"end": 81.27,
+"nseg": 1,
+"d": 1.79
+},
+{
+"spk": "n",
+"text": "Silence settles between them.",
+"t": 82.08,
+"end": 83.51,
+"nseg": 1,
+"d": 1.43
+},
+{
+"spk": "n",
+"text": "The atheist stares into his glass.",
+"t": 84.2,
+"end": 85.98,
+"nseg": 1,
+"d": 1.78
+},
+{
+"spk": "a",
+"text": "I used to believe in God, you know.",
+"t": 86.69,
+"end": 88.29,
+"nseg": 1,
+"d": 1.6
+},
+{
+"spk": "n",
+"text": "The pastor says nothing.",
+"t": 89.27,
+"end": 90.43,
+"nseg": 1,
+"d": 1.16
+},
+{
+"spk": "a",
+"text": "I prayed every night when my daughter got sick. I begged Him. I promised Him everything. I would have given my life for hers.",
+"t": 91.14,
+"end": 99.14,
+"nseg": 4,
+"d": 8.0
+},
+{
+"spk": "n",
+"text": "His voice begins to break.",
+"t": 99.98,
+"end": 101.28,
+"nseg": 1,
+"d": 1.3
+},
+{
+"spk": "a",
+"text": "She was seven.",
+"t": 101.93,
+"end": 102.74,
+"nseg": 1,
+"d": 0.81
+},
+{
+"spk": "n",
+"text": "The pastor slowly sets down his water.",
+"t": 103.68,
+"end": 105.78,
+"nseg": 1,
+"d": 2.1
+},
+{
+"spk": "a",
+"text": "And when we buried her, everyone told me God had a plan.",
+"t": 106.55,
+"end": 109.79,
+"nseg": 2,
+"d": 3.24
+},
+{
+"spk": "n",
+"text": "The atheist looks directly at him.",
+"t": 110.41,
+"end": 112.01,
+"nseg": 1,
+"d": 1.6
+},
+{
+"spk": "a",
+"text": "Tell me, Pastor. What kind of plan requires a seven-year-old girl to die?",
+"t": 112.6,
+"end": 116.76,
+"nseg": 2,
+"d": 4.16
+},
+{
+"spk": "n",
+"text": "The pastor's eyes fill with tears.",
+"t": 117.47,
+"end": 119.24,
+"nseg": 1,
+"d": 1.77
+},
+{
+"spk": "p",
+"text": "I would never tell a grieving father that I knew why his daughter died.",
+"t": 119.79,
+"end": 124.56,
+"nseg": 2,
+"d": 4.77
+},
+{
+"spk": "a",
+"text": "Then what would you tell him?",
+"t": 125.23,
+"end": 126.36,
+"nseg": 1,
+"d": 1.13
+},
+{
+"spk": "n",
+"text": "The pastor pauses.",
+"t": 126.85,
+"end": 129.04,
+"nseg": 1,
+"d": 2.19
+},
+{
+"spk": "p",
+"text": "That when Jesus stood at the tomb of Lazarus, knowing He was about to raise him from the dead, He still wept.",
+"t": 129.41,
+"end": 134.82,
+"nseg": 3,
+"d": 5.41
+},
+{
+"spk": "n",
+"text": "The atheist looks away.",
+"t": 135.56,
+"end": 135.98,
+"nseg": 1,
+"d": 0.42
+},
+{
+"spk": "a",
+"text": "Why?",
+"t": 136.85,
+"end": 140.46,
+"nseg": 1,
+"d": 3.61
+},
+{
+"spk": "p",
+"text": "Because knowing resurrection was coming didn't make death any less heartbreaking.",
+"t": 140.95,
+"end": 144.93,
+"nseg": 2,
+"d": 3.98
+},
+{
+"spk": "n",
+"text": "Neither man speaks for several minutes.",
+"t": 145.46,
+"end": 147.81,
+"nseg": 1,
+"d": 2.35
+},
+{
+"spk": "n",
+"text": "Finally, the atheist whispers.",
+"t": 148.37,
+"end": 149.3,
+"nseg": 1,
+"d": 0.93
+},
+{
+"spk": "a",
+"text": "I don't hate God because I know He doesn't exist.",
+"t": 149.88,
+"end": 154.14,
+"nseg": 2,
+"d": 4.26
+},
+{
+"spk": "n",
+"text": "The pastor waits.",
+"t": 154.89,
+"end": 156.19,
+"nseg": 1,
+"d": 1.3
+},
+{
+"spk": "a",
+"text": "I hate the possibility that He does exist, and He watched me bury my daughter.",
+"t": 157.05,
+"end": 161.68,
+"nseg": 2,
+"d": 4.63
+},
+{
+"spk": "n",
+"text": "The pastor nods slowly.",
+"t": 162.27,
+"end": 163.67,
+"nseg": 1,
+"d": 1.4
+},
+{
+"spk": "p",
+"text": "That's a much harder question than whether God exists.",
+"t": 164.48,
+"end": 165.18,
+"nseg": 1,
+"d": 0.7
+},
+{
+"spk": "n",
+"text": "The atheist wipes his eyes.",
+"t": 166.04,
+"end": 166.34,
+"nseg": 1,
+"d": 0.3
+},
+{
+"spk": "a",
+"text": "So what am I supposed to do? Believe again?",
+"t": 167.02,
+"end": 168.06,
+"nseg": 1,
+"d": 1.04
+},
+{
+"spk": "p",
+"text": "No. I'm not going to ask you to pretend you're convinced.",
+"t": 168.74,
+"end": 172.01,
+"nseg": 2,
+"d": 3.27
+},
+{
+"spk": "a",
+"text": "Then what?",
+"t": 172.77,
+"end": 174.14,
+"nseg": 1,
+"d": 1.37
+},
+{
+"spk": "n",
+"text": "The pastor looks toward the door.",
+"t": 174.72,
+"end": 175.26,
+"nseg": 1,
+"d": 0.54
+},
+{
+"spk": "p",
+"text": "Go home. Remember your daughter. Love her without apologizing for how much it hurts. And if you ever decide to pray again, don't give God the words you think a pastor wants to hear. Give Him the ones you've been afraid to say.",
+"t": 175.86,
+"end": 190.78,
+"nseg": 6,
+"d": 14.92
+},
+{
+"spk": "n",
+"text": "The atheist looks at his empty glass.",
+"t": 191.5,
+"end": 193.26,
+"nseg": 1,
+"d": 1.76
+},
+{
+"spk": "a",
+"text": "You think God can handle my anger?",
+"t": 193.85,
+"end": 194.93,
+"nseg": 1,
+"d": 1.08
+},
+{
+"spk": "n",
+"text": "The pastor answers.",
+"t": 195.54,
+"end": 196.42,
+"nseg": 1,
+"d": 0.88
+},
+{
+"spk": "p",
+"text": "If He is God, your anger cannot destroy Him. And if He is good, your grief will not surprise Him.",
+"t": 196.88,
+"end": 201.86,
+"nseg": 3,
+"d": 4.98
+},
+{
+"spk": "n",
+"text": "The atheist stands to leave.",
+"t": 202.58,
+"end": 204.0,
+"nseg": 1,
+"d": 1.42
+},
+{
+"spk": "n",
+"text": "At the door, he turns around.",
+"t": 204.61,
+"end": 206.04,
+"nseg": 1,
+"d": 1.43
+},
+{
+"spk": "a",
+"text": "Pastor, did you ever lose someone you prayed God would save?",
+"t": 206.88,
+"end": 210.39,
+"nseg": 2,
+"d": 3.51
+},
+{
+"spk": "n",
+"text": "The pastor reaches into his wallet and pulls out a faded photograph of a young boy.",
+"t": 211.22,
+"end": 215.55,
+"nseg": 2,
+"d": 4.33
+},
+{
+"spk": "p",
+"text": "My son. He was nine.",
+"t": 216.11,
+"end": 216.66,
+"nseg": 1,
+"d": 0.55
+},
+{
+"spk": "n",
+"text": "The atheist stares at the picture.",
+"t": 217.35,
+"end": 217.95,
+"nseg": 1,
+"d": 0.6
+},
+{
+"spk": "a",
+"text": "And you still believe?",
+"t": 218.69,
+"end": 220.23,
+"nseg": 1,
+"d": 1.54
+},
+{
+"spk": "n",
+"text": "The pastor looks at the photograph for a long time.",
+"t": 221.03,
+"end": 221.99,
+"nseg": 1,
+"d": 0.96
+},
+{
+"spk": "p",
+"text": "Some days, I believe with confidence. Other days, all I can manage is to ask God why. But I learned something after burying him.",
+"t": 222.8,
+"end": 230.72,
+"nseg": 3,
+"d": 7.92
+},
+{
+"spk": "a",
+"text": "What's that?",
+"t": 231.47,
+"end": 233.33,
+"nseg": 1,
+"d": 1.86
+},
+{
+"spk": "n",
+"text": "The pastor folds the photograph carefully.",
+"t": 234.28,
+"end": 234.72,
+"nseg": 1,
+"d": 0.44
+},
+{
+"spk": "p",
+"text": "I used to think faith meant never questioning God. Now I think faith sometimes means refusing to stop talking to Him, even when all you have left are questions.",
+"t": 235.85,
+"end": 247.71,
+"nseg": 4,
+"d": 11.86
+},
+{
+"spk": "n",
+"text": "The atheist walks back to the table and sits down.",
+"t": 248.28,
+"end": 250.73,
+"nseg": 1,
+"d": 2.45
+},
+{
+"spk": "n",
+"text": "He doesn't order another whiskey.",
+"t": 251.35,
+"end": 252.8,
+"nseg": 1,
+"d": 1.45
+},
+{
+"spk": "n",
+"text": "The pastor doesn't offer another sermon.",
+"t": 253.42,
+"end": 255.39,
+"nseg": 1,
+"d": 1.97
+},
+{
+"spk": "n",
+"text": "And for the next two hours, two fathers sit together, speaking about the children they loved.",
+"t": 255.92,
+"end": 260.93,
+"nseg": 2,
+"d": 5.01
+},
+{
+"spk": "n",
+"text": "One believes in God.",
+"t": 261.43,
+"end": 262.51,
+"nseg": 1,
+"d": 1.08
+},
+{
+"spk": "n",
+"text": "The other doesn't know what he believes anymore.",
+"t": 263.0,
+"end": 264.97,
+"nseg": 1,
+"d": 1.97
+},
+{
+"spk": "n",
+"text": "But when the bartender comes to close, he notices something strange.",
+"t": 265.56,
+"end": 267.32,
+"nseg": 1,
+"d": 1.76
+},
+{
+"spk": "n",
+"text": "The atheist is praying.",
+"t": 267.78,
+"end": 269.28,
+"nseg": 1,
+"d": 1.5
+},
+{
+"spk": "n",
+"text": "And the pastor is crying.",
+"t": 269.88,
+"end": 271.12,
+"nseg": 1,
+"d": 1.24
+},
+{
+"spk": "n",
+"text": "Because sometimes the deepest conversations about God don't end with someone winning an argument.",
+"t": 271.76,
+"end": 273.08,
+"nseg": 1,
+"d": 1.32
+},
+{
+"spk": "n",
+"text": "Sometimes they end with two broken people realizing that the person across from them understands their pain.",
+"t": 273.66,
+"end": 284.09,
+"nseg": 2,
+"d": 10.43
+}
+]

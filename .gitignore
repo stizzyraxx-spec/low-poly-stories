@@ -1,0 +1,18 @@
+# rendered output — MP4s ship as GitHub Release assets, never in git
+*.mp4
+frames/
+*.log
+
+# intermediates
+voice.b64
+voice.mp3
+raw.txt
+silences.txt
+*-check.js
+insp/
+smoke/
+bench/
+sync/
+
+node_modules/
+.DS_Store
