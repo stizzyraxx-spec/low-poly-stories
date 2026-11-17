@@ -224,6 +224,19 @@
   }
   #play:hover { background: rgba(232,162,76,0.14); border-color: var(--amber); }
 
+  .get {
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(239,230,220,0.22);
+    padding-bottom: 2px;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .get:hover { color: var(--amber); border-color: var(--amber); }
+  .get:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
   #loading {
     font-size: 0.7rem;
     letter-spacing: 0.12em;
@@ -279,14 +292,16 @@
 
 <div id="title">
   <h1><em>A short film</em>Two Fathers</h1>
-  <p>An atheist and a pastor at closing time. Five minutes, no narration read aloud &mdash; the lines appear as they are spoken.</p>
+  <p>An atheist and a pastor at closing time. Four minutes and forty-four seconds, narrated &mdash; best with sound on.</p>
   <button class="btn" id="play">Begin</button>
   <span id="loading">Loading narration&hellip;</span>
+  <a class="get" href="https://github.com/stizzyraxx-spec/low-poly-stories/releases/latest" target="_blank" rel="noopener">Download the MP4 &mdash; 43 MB</a>
 </div>
 
 <div id="end">
   <p>Sometimes the deepest conversations about God don't end with someone winning an argument.</p>
   <button class="btn" id="again">Play again</button>
+  <a class="get" href="https://github.com/stizzyraxx-spec/low-poly-stories/releases/latest" target="_blank" rel="noopener">Download the MP4 &mdash; 43 MB</a>
 </div>
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,400;0,500;1,400&family=Archivo:wght@500;600&display=swap">
