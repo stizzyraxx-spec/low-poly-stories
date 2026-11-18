@@ -120,10 +120,14 @@ function makeFilm(ctx) {
   function solveCamera(t, dt) {
     // mid-line subcuts
     for (var s = subIdx + 1; s < SUBCUTS.length; s++) {
-      if (SUBCUTS[s].t <= t) {
-        cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
-        subIdx = s;
-      } else break;
+      if (SUBCUTS[s].t > t) break;
+      subIdx = s;
+      // A subcut belongs to its scene. Without this check a late subcut
+      // survives the cut into the next scene and re-aims the camera at an
+      // interior shot while an exterior is on stage - at t=150 the active
+      // camera was hSaulCU, a scene-7 room shot, with scene 8 staged.
+      if (SUBCUTS[s].sc !== undefined && SUBCUTS[s].sc !== curScene) continue;
+      cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
     }
 
     var now = sampleShot(curShot, t);

@@ -205,7 +205,44 @@ MAIN = r'''
       grab: function (t) {
         transport.advanceTo(t);
         return canvas.toDataURL("image/jpeg", 0.92);
+      },
+      // Framing check only: jump to t and settle the easing over a few
+      // frames instead of replaying the film. Not frame-exact, so never used
+      // for a real render - but camera and pose are right, which is what a
+      // look needs.
+      peek: function (t) {
+        transport.jumpTo(t, 30);
+        return canvas.toDataURL("image/jpeg", 0.92);
       }
+    };
+    // Debug hook: report where the camera is and who is actually in front
+    // of it. Looking at one frame cannot tell you whether a figure is
+    // missing or merely out of shot; this can.
+    window.__dbg = function () {
+      var out = { cam: camera.position.toArray().map(function (n) { return +n.toFixed(2); }),
+                  visible: [], inFrustum: [] };
+      camera.updateMatrixWorld();
+      var m = new THREE.Matrix4().multiplyMatrices(
+        camera.projectionMatrix, camera.matrixWorldInverse);
+      var fr = new THREE.Frustum().setFromProjectionMatrix(m);
+      var names = ['saul','anan','comp1','comp2','chris','citA','citB'];
+      for (var i = 0; i < names.length; i++) {
+        var c = cast[names[i]];
+        if (!c || !c.root.visible) continue;
+        out.visible.push(names[i]);
+        var v = new THREE.Vector3();
+        c.head.getWorldPosition(v);
+        if (fr.containsPoint(v)) out.inFrustum.push(names[i]);
+      }
+      var nCrowd = 0;
+      for (var k = 0; k < cast.crowd.length; k++) {
+        if (!cast.crowd[k].root.visible) continue;
+        var cv = new THREE.Vector3();
+        cast.crowd[k].head.getWorldPosition(cv);
+        if (fr.containsPoint(cv)) nCrowd++;
+      }
+      out.crowdInFrustum = nCrowd;
+      return out;
     };
     window.__filmReady = true;
   } else {

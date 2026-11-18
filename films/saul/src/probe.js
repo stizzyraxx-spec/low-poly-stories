@@ -16,7 +16,7 @@ const TIMES=(process.env.TIMES||'14,25,44.5,50,60,77,92,113,132,150,165,195')
   await p.waitForTimeout(400);
   const out=process.env.OUT; fs.mkdirSync(out,{recursive:true});
   for(const t of TIMES){
-    const d=await p.evaluate(`window.__film.grab(${t})`);
+    const d=await p.evaluate(`window.__film.peek(${t})`);
     fs.writeFileSync(path.join(out,'t'+String(Math.round(t)).padStart(3,'0')+'.jpg'),
       Buffer.from(d.slice(d.indexOf(',')+1),'base64'));
     console.log('grabbed',t);

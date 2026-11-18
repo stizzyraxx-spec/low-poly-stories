@@ -102,8 +102,19 @@ function makeTransport(opts) {
     if (target === 0) step(0, 1 / FPS);
   }
 
+  // Jump straight to t for inspection: apply every beat up to t, then run
+  // `settle` frames so eased values land near their targets. Cheap, but NOT
+  // frame-exact - renders must use advanceTo.
+  function jumpTo(t, settle) {
+    time = t;
+    beatIdx = -1;
+    sync(t);
+    for (var i = 0; i < (settle || 20); i++) frame(t, 1 / FPS);
+  }
+
   return {
     play: play, reset: reset, seekTo: seekTo, advanceTo: advanceTo,
+    jumpTo: jumpTo,
     step: step, duration: duration,
     get time() { return time; },
     get beatIdx() { return beatIdx; }

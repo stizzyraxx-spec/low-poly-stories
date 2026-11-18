@@ -18,24 +18,50 @@ function headOf(c, out) {
   return out;
 }
 
-// A close-up: stand off the subject's eyeline at `dist`, offset by `yaw`
-// radians around them, looking at the head. `side` biases the subject off
-// centre so the frame has somewhere to look.
+// A close-up: stand in FRONT of the subject's face at `dist`, offset by
+// `yaw` radians, looking at the head.
+//
+// The camera goes where the face is pointing, not behind the subject: a
+// figure's root rotation is its facing, so the camera must sit along +facing,
+// and `yaw` then swings it off-axis for a three-quarter view. Getting this
+// backwards puts the camera behind the head, which on the first pass filled a
+// third of the frame with the back of someone's skull while the speaker stood
+// small in the distance.
+//
+// `blockers` lists figures that must not come between camera and subject. If
+// one is close to the camera-subject line, the shot swings to the other side
+// rather than shooting through them. Cheap, and it catches the case that
+// hand-typed coordinates never could: someone having moved into the shot.
 function cu(subject, opts) {
   opts = opts || {};
+  var vb = new THREE.Vector3();
   return {
     derive: function (t, v, look) {
-      headOf(subject, v);
-      look.copy(v);
-      var yaw = (subject ? subject.root.rotation.y : 0) + Math.PI + (opts.yaw || 0);
-      var d = opts.dist || 1.35;
-      v.x += Math.sin(yaw) * d;
-      v.z += Math.cos(yaw) * d;
-      v.y = look.y + (opts.rise === undefined ? 0.06 : opts.rise);
-      if (opts.side) {       // shift the camera sideways, keep the look fixed
-        v.x += Math.cos(yaw) * opts.side;
-        v.z -= Math.sin(yaw) * opts.side;
+      headOf(subject, look);
+      var base = (subject ? subject.root.rotation.y : 0);
+      var yaw = base + (opts.yaw || 0);
+      var d = opts.dist || 2.6;
+
+      // does anyone stand near the line from here to the subject?
+      var flip = 1;
+      var list = opts.blockers;
+      if (list) {
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (!o || o === subject || !o.root.visible) continue;
+          headOf(o, vb);
+          var cx = look.x + Math.sin(yaw) * d - vb.x;
+          var cz = look.z + Math.cos(yaw) * d - vb.z;
+          if (Math.sqrt(cx * cx + cz * cz) < 0.95) { flip = -1; break; }
+        }
       }
+      yaw = base + (opts.yaw || 0) * flip;
+      v.set(look.x + Math.sin(yaw) * d,
+            look.y + (opts.rise === undefined ? 0.10 : opts.rise),
+            look.z + Math.cos(yaw) * d);
+      // Frame head and shoulders, not just a face: aim a little below the
+      // eyes so the skull is not clipped by the top of frame.
+      look.y -= 0.12;
     },
     fov: opts.fov || 27,
     drift: opts.drift || [0.16, 0.08, 0.05]
@@ -90,7 +116,11 @@ function wideOn(subject, opts) {
   return {
     derive: function (t, v, look) {
       headOf(subject, v);
-      look.set(v.x, (opts.lookY === undefined ? 1.35 : opts.lookY), v.z);
+      // Track the subject's own head height rather than a fixed world Y:
+      // a kneeling or fallen figure needs a lower aim than a standing one,
+      // and a fixed value crops whoever does not match it.
+      look.set(v.x, v.y - (opts.below === undefined ? 0.35 : opts.below), v.z);
+      if (opts.lookY !== undefined) look.y = opts.lookY;
       var yaw = (opts.yaw || 0);
       var d = opts.dist || 6.5;
       v.set(look.x + Math.sin(yaw) * d,
@@ -110,8 +140,10 @@ function hero(subject, opts) {
       headOf(subject, v);
       look.copy(v);
       look.y += 0.1;
-      var yaw = (subject ? subject.root.rotation.y : 0) + Math.PI + (opts.yaw || 0);
-      var d = opts.dist || 2.2;
+      // in front of the face, like cu() - a hero angle shot from behind is
+      // just the back of a head seen from the floor
+      var yaw = (subject ? subject.root.rotation.y : 0) + (opts.yaw || 0);
+      var d = opts.dist || 3.1;
       v.set(look.x + Math.sin(yaw) * d,
             opts.height === undefined ? 0.85 : opts.height,
             look.z + Math.cos(yaw) * d);

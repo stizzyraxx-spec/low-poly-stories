@@ -180,16 +180,21 @@ function stageScene(n, C, SETS) {
 
   if (n === 8) {
     SETS.court.visible = true;
-    place(C.saul, -0.15, -2.2, 0);              // on the steps, facing the crowd
+    // Saul on the steps facing +z; the crowd stands in front of him, which
+    // is also between him and the wide cameras, so a wide shot of him
+    // preaching actually contains an audience. (First pass staged the crowd
+    // behind every camera, so he appeared to preach to an empty courtyard.)
+    place(C.saul, -0.15, -5.4, 0);
     C.saul.root.position.y = 0.72;
-    place(C.citA, -3.4, 2.0, -0.5);
-    place(C.citB, 3.5, 2.1, 0.5);
+    place(C.citA, -2.9, -2.4, Math.PI - 0.35);
+    place(C.citB, 3.0, -2.2, Math.PI + 0.3);
     // the crowd in a loose arc, nobody on a grid
+    // a loose arc in front of the steps, nobody on a grid
     var arc = [
-      [-5.0, 3.4, -0.4], [-3.0, 4.1, -0.2], [-1.2, 3.0, 0.05], [0.6, 3.8, 0.0],
-      [2.4, 3.1, 0.15], [4.6, 3.9, 0.35], [-4.2, 5.6, -0.3], [-1.9, 6.0, -0.1],
-      [0.3, 5.4, 0.0], [2.8, 5.9, 0.2], [5.2, 5.5, 0.3], [-6.1, 4.8, -0.45],
-      [6.3, 4.4, 0.45], [1.5, 7.2, 0.05]
+      [-4.4, -1.2, -0.30], [-2.6, -0.5, -0.18], [-1.0, -1.4, 0.05], [0.7, -0.6, 0.0],
+      [2.3, -1.3, 0.14], [4.1, -0.7, 0.30], [-3.7, 1.0, -0.26], [-1.7, 1.5, -0.10],
+      [0.4, 0.9, 0.0], [2.5, 1.4, 0.18], [4.6, 1.1, 0.28], [-5.4, 0.4, -0.40],
+      [5.6, 0.2, 0.40], [1.3, 2.7, 0.05]
     ];
     for (var ci = 0; ci < C.crowd.length; ci++) {
       place(C.crowd[ci], arc[ci][0], arc[ci][1], arc[ci][2] + Math.PI);

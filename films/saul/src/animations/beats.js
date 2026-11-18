@@ -77,22 +77,22 @@ var BEATS = [
 // orbit need to move inside a single line, which the brief asks for. Each
 // entry re-aims the camera at an absolute time without touching the beat.
 var SUBCUTS = [
-  { t:40.60,  cam:"lOrbit"     },  // the light rises: start the orbit early
-  { t:55.90,  cam:"lFallen"    },  // back out to see him on the ground
-  { t:60.90,  cam:"bHands"     },  // his hands, searching
-  { t:76.40,  cam:"dPray"      },  // push in on the praying figure
-  { t:79.60,  cam:"dPrayCU"    },
-  { t:87.20,  cam:"aCU"        },
-  { t:94.60,  cam:"aCUtight"   },  // the protest, close
-  { t:102.10, cam:"aCU"        },
-  { t:116.40, cam:"hAnanCU"    },  // Ananias explaining, close
-  { t:120.60, cam:"hSaulCU"    },  // Saul listening to it
-  { t:131.90, cam:"hTwo"       },  // he sees the man in front of him
-  { t:140.20, cam:"hSaulCU"    },
-  { t:165.30, cam:"pOver"      },  // the testimony, from the crowd
-  { t:168.90, cam:"pCrowdA"    },  // a face in that crowd
-  { t:171.40, cam:"pSaulCU"    },
-  { t:179.80, cam:"pWide"      },  // the audience has grown
-  { t:189.40, cam:"pSaulHero"  },
-  { t:195.80, cam:"fRoad"      }   // last look at him on the road
+  { t:40.60, sc:3, cam:"lOrbit"     },  // the light rises: start the orbit early
+  { t:55.90, sc:3, cam:"lFallen"    },  // back out to see him on the ground
+  { t:60.90, sc:4, cam:"bHands"     },  // his hands, searching
+  { t:76.40, sc:5, cam:"dPray"      },  // push in on the praying figure
+  { t:79.60, sc:5, cam:"dPrayCU"    },
+  { t:87.20, sc:6, cam:"aCU"        },
+  { t:94.60, sc:6, cam:"aCUtight"   },  // the protest, close
+  { t:102.10, sc:6, cam:"aCU"        },
+  { t:116.40, sc:7, cam:"hAnanCU"    },  // Ananias explaining, close
+  { t:120.60, sc:7, cam:"hSaulCU"    },  // Saul listening to it
+  { t:131.90, sc:7, cam:"hTwo"       },  // he sees the man in front of him
+  { t:140.20, sc:7, cam:"hSaulCU"    },
+  { t:165.30, sc:8, cam:"pOver"      },  // the testimony, from the crowd
+  { t:168.90, sc:8, cam:"pCrowdA"    },  // a face in that crowd
+  { t:171.40, sc:8, cam:"pSaulCU"    },
+  { t:179.80, sc:8, cam:"pWide"      },  // the audience has grown
+  { t:189.40, sc:8, cam:"pSaulHero"  },
+  { t:195.80, sc:9, cam:"fRoad"      }   // last look at him on the road
 ];
