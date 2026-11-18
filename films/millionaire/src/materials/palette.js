@@ -43,7 +43,7 @@ var PAL = {
   blouse: 0xb88ca0, skirtDark: 0x3a3a44,
   friendJacket: 0x4a5560, friendShirt: 0x9aa8b4,
   plainShirt: 0x7f8c99, plainShirtAlt: 0x8a8578, jeans: 0x4a5668,
-  hairDark: 0x2a2420, hairGrey: 0x8a8880, hairSalt: 0x5a5650,
+  hairDark: 0x2a2420, hairGrey: 0x8a8880, hairSalt: 0x5a5650, hairMid: 0x4a3c30,
   hairWife: 0x4a3a30, hairBlonde: 0xa88a5e,
 
   // light / sky

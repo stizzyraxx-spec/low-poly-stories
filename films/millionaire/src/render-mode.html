@@ -1,0 +1,2753 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Millionaire Who Lost Everything</title>
+<style>
+  html,body{margin:0;background:#000;overflow:hidden}
+  #stage{display:block;width:100vw;height:56.25vw;max-height:100vh;max-width:177.78vh;
+         position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+  #gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:#000;color:#e8dcc8;font:600 15px/1.5 system-ui,-apple-system,sans-serif;
+        letter-spacing:.18em;text-transform:uppercase;cursor:pointer;z-index:9999}
+  #gate.off{display:none}
+</style>
+<canvas id="stage" width="1280" height="720"></canvas>
+<audio id="voice" preload="auto"></audio>
+<div id="gate">Play &mdash; sound on</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var AUDIO_SRC = "";
+  var THREE = window.THREE;
+
+  // Deterministic pseudo-random. The render is sharded across processes and
+  // restarted after crashes, so every frame must be reproducible; nothing may
+  // call Math.random() once the scene is built.
+  var NSEED = 1973;
+  function rnd() {
+    NSEED = (NSEED * 1103515245 + 12345) & 0x7fffffff;
+    return NSEED / 0x7fffffff;
+  }
+
+  function mat(hex, o) {
+    o = o || {};
+    var m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
+    if (o.transparent) { m.transparent = true; m.opacity = o.opacity; }
+    if (o.emissive) m.emissive = new THREE.Color(o.emissive);
+    if (o.side) m.side = o.side;
+    return m;
+  }
+  function emat(hex, op) {
+    return new THREE.MeshBasicMaterial({ color: hex, transparent: true,
+                                         opacity: op === undefined ? 1 : op });
+  }
+
+// ===== materials/palette.js ====================================
+// materials/palette.js — modern American metropolitan.
+//
+// Two worlds, one palette. The empire is glass, steel, warm wood and a navy
+// suit; the apartment is painted drywall, pine and cotton. The man's suit
+// colour survives into the second half as the jacket he no longer wears, so
+// the two halves read as the same person's life.
+var PAL = {
+  // glass and tower
+  glass: 0x8fb6cc, glassDark: 0x5c7f96, glassLit: 0xbcd8e8,
+  steel: 0x9aa0a6, steelDark: 0x6b7076, chrome: 0xc8ccd0,
+  concrete: 0x8e8e8e, concreteDark: 0x6a6a6a,
+  towerA: 0x7e8c99, towerB: 0x6b7885, towerC: 0x97a3ad, towerFar: 0xa8b3bd,
+
+  // the executive office
+  deskWood: 0x6b4a32, deskWoodDark: 0x4a3221, deskTop: 0x7d5a3e,
+  leatherChair: 0x24242a, carpet: 0x4a4a52, stoneFloor: 0xb4ada4,
+  shelf: 0x5c4634, artA: 0x3a5a7a, artB: 0x7a4a3a, plant: 0x4a6b42,
+  plantPot: 0xd8d4cc, screen: 0x1a1e26, screenLit: 0x2a4a6a,
+
+  // the hospital
+  hospWall: 0xdce6ec, hospWallLo: 0xc2d2dc, hospFloor: 0xd8dde0,
+  hospTrim: 0x7fa8bc, scrubs: 0x4a7f99, coat: 0xf0f2f4, hospChair: 0x6b8fa4,
+
+  // the luxury residence
+  homeWall: 0xcfc6ba, homeWallDark: 0x9a9288, homeFloor: 0x7d6349,
+  couch: 0x55606b, couchDark: 0x3f4852, rugHome: 0x6b5a4a,
+  counter: 0x3a3f46, lampWarm: 0xffc87a,
+
+  // the modest apartment
+  aptWall: 0xc8c2b4, aptWallDark: 0x9c968a, aptFloor: 0x8a7558,
+  aptCouch: 0x7a705f, aptCouchDark: 0x5c5447, box: 0xb59264, boxDark: 0x8e7049,
+  curtain: 0xd4cec0, pine: 0xa8874f,
+
+  // street
+  asphalt: 0x44464a, sidewalk: 0x9a9890, shopA: 0x8a6a52, shopB: 0x6a7a6a,
+  carA: 0x3a4650, carB: 0x7a3a3a, carC: 0xcfd2d6, treeGreen: 0x4a6b3a,
+  trunk: 0x5a4632, lampPost: 0x3a3e42,
+
+  // people
+  skinA: 0xd8ab86, skinB: 0xc08a5e, skinC: 0xa87350, skinD: 0xe0bb98,
+  suitNavy: 0x2a3550, suitCharcoal: 0x33363c, shirtWhite: 0xeef0f2,
+  tieA: 0x7a2a35, watch: 0xd4b45a,
+  blouse: 0xb88ca0, skirtDark: 0x3a3a44,
+  friendJacket: 0x4a5560, friendShirt: 0x9aa8b4,
+  plainShirt: 0x7f8c99, plainShirtAlt: 0x8a8578, jeans: 0x4a5668,
+  hairDark: 0x2a2420, hairGrey: 0x8a8880, hairSalt: 0x5a5650, hairMid: 0x4a3c30,
+  hairWife: 0x4a3a30, hairBlonde: 0xa88a5e,
+
+  // light / sky
+  daySky: 0x8cb8e0, overcast: 0x9aa4ae, nightSky: 0x141a26,
+  dawnSky: 0xf0a878, lampGlow: 0xffc87a, fluoro: 0xe8f2f6,
+  rain: 0x9ab4c8
+};
+
+
+// ===== characters/rig.js =======================================
+// characters/rig.js — one jointed low-poly body, reused for every character.
+//
+// The joint stack is hips -> torso -> chest -> neck -> head, so a curved spine
+// and a lowered head compose instead of fighting each other. Faces have no
+// blend shapes: expression is brow angle, eyelid position, jaw opening and the
+// line of the shoulders, which is all that reads at these shot sizes anyway.
+//
+// Every character is built from this one function. Variation comes from cfg
+// (skin, robe, hair, height, build, headwear) rather than from separate
+// meshes, so a crowd is cheap and no two figures are identical.
+
+function buildPerson(cfg) {
+  cfg = cfg || {};
+  var P = new THREE.Group();
+  var skin = mat(cfg.skin || PAL.skinA);
+  var cloth = mat(cfg.robe || PAL.robeCrowdA);
+  var under = mat(cfg.under || cfg.robe || PAL.robeCrowdB);
+  var hairM = mat(cfg.hair || PAL.hairDark);
+  var scale = cfg.height || 1;
+  var build = cfg.build || 1;          // 1 = average, >1 heavier
+  P.scale.setScalar(scale);
+
+  // ---- hips / torso / chest ----
+  var hips = new THREE.Group();
+  hips.position.y = 0.92;
+  P.add(hips);
+
+  var torso = new THREE.Group();
+  hips.add(torso);
+
+  var pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.40 * build, 0.24, 0.26), cloth);
+  pelvis.position.y = 0.10;
+  pelvis.castShadow = true;
+  torso.add(pelvis);
+
+  var chest = new THREE.Group();
+  chest.position.y = 0.26;
+  torso.add(chest);
+
+  var ribs = new THREE.Mesh(new THREE.BoxGeometry(0.46 * build, 0.40, 0.28), cloth);
+  ribs.position.y = 0.18;
+  ribs.castShadow = true;
+  chest.add(ribs);
+
+  // Silhouette below the waist. `modern` gives trousers (the legs read on
+  // their own); otherwise a tapered skirt, which is what sells a robe.
+  // `robe` is returned either way so a costume change can recolour one thing.
+  var robe;
+  if (cfg.modern) {
+    robe = new THREE.Mesh(new THREE.BoxGeometry(0.38 * build, 0.30, 0.27),
+                          mat(cfg.trousers || cfg.robe || PAL.suitCharcoal));
+    robe.position.y = -0.09;
+    robe.castShadow = true;
+    torso.add(robe);
+  } else {
+    robe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.30 * build, 0.42 * build, 0.95, 7, 1, true), cloth);
+    robe.position.y = -0.38;
+    robe.castShadow = true;
+    torso.add(robe);
+  }
+
+  // A suit jacket: two front panels with a gap, open over the shirt. Worn
+  // open so the shirt colour stays visible, which is what makes the later
+  // jacket-off change legible at a glance.
+  var jacket = null;
+  if (cfg.jacket) {
+    jacket = new THREE.Group();
+    var jm = mat(cfg.jacket);
+    for (var js = -1; js <= 1; js += 2) {
+      var panel = new THREE.Mesh(new THREE.BoxGeometry(0.19 * build, 0.66, 0.30), jm);
+      panel.position.set(js * 0.145 * build, 0.04, 0.012);
+      panel.castShadow = true;
+      jacket.add(panel);
+    }
+    var back = new THREE.Mesh(new THREE.BoxGeometry(0.50 * build, 0.66, 0.08), jm);
+    back.position.set(0, 0.04, -0.125);
+    back.castShadow = true;
+    jacket.add(back);
+    var collarL = new THREE.Mesh(new THREE.BoxGeometry(0.10 * build, 0.20, 0.10), jm);
+    collarL.position.set(-0.13 * build, 0.30, 0.10);
+    collarL.rotation.z = 0.3;
+    jacket.add(collarL);
+    var collarR = collarL.clone();
+    collarR.position.x = 0.13 * build;
+    collarR.rotation.z = -0.3;
+    jacket.add(collarR);
+    chest.add(jacket);
+  }
+
+  if (cfg.tie) {
+    var tie = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.34, 0.025), mat(cfg.tie));
+    tie.position.set(0, 0.16, 0.148);
+    chest.add(tie);
+  }
+
+  // The watch is its own object so it can come off on camera later.
+  var watch = null;
+  if (cfg.watch) {
+    watch = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.035, 0.09),
+                           mat(cfg.watch));
+    watch.position.y = -0.255;
+  }
+
+  if (cfg.sash) {
+    var sash = new THREE.Mesh(new THREE.BoxGeometry(0.48 * build, 0.09, 0.30), mat(cfg.sash));
+    sash.position.y = 0.00;
+    chest.add(sash);
+  }
+  if (cfg.belt) {
+    var belt = new THREE.Mesh(new THREE.BoxGeometry(0.42 * build, 0.07, 0.28), mat(PAL.leather));
+    belt.position.y = 0.00;
+    torso.add(belt);
+  }
+  if (cfg.mantle) {   // a cloak over one shoulder
+    var mantle = new THREE.Mesh(new THREE.BoxGeometry(0.50 * build, 0.52, 0.10), mat(cfg.mantle));
+    mantle.position.set(0, 0.10, -0.17);
+    chest.add(mantle);
+  }
+
+  // ---- neck / head ----
+  var neck = new THREE.Group();
+  neck.position.y = 0.40;
+  chest.add(neck);
+
+  var neckM = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.13, 6), skin);
+  neckM.position.y = 0.05;
+  neck.add(neckM);
+
+  var head = new THREE.Group();
+  head.position.y = 0.17;
+  neck.add(head);
+
+  var skull = new THREE.Mesh(new THREE.BoxGeometry(0.235, 0.27, 0.235), skin);
+  skull.castShadow = true;
+  head.add(skull);
+
+  var brow = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.03), skin);
+  brow.position.set(0, 0.055, 0.122);
+  head.add(brow);
+
+  // jaw hinges at the back so the chin swings, as a jaw does
+  var jaw = new THREE.Group();
+  jaw.position.set(0, -0.085, -0.06);
+  head.add(jaw);
+  var jawM = new THREE.Mesh(new THREE.BoxGeometry(0.205, 0.085, 0.215), skin);
+  jawM.position.set(0, -0.02, 0.085);
+  jaw.add(jawM);
+
+  var mouth = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.022, 0.012), mat(0x4a2c22));
+  mouth.position.set(0, -0.012, 0.196);
+  jaw.add(mouth);
+
+  function eye(sx) {
+    var g = new THREE.Group();
+    g.position.set(sx * 0.062, 0.008, 0.108);
+    var white = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.040, 0.012), mat(0xf0e6d8));
+    g.add(white);
+    var iris = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.026, 0.014), mat(cfg.eye || 0x3b2a1c));
+    iris.position.z = 0.004;
+    g.add(iris);
+    // lid slides down over the eye - blinks and the half-lidded blind look
+    var lid = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.044, 0.016), skin);
+    lid.position.set(0, 0.044, 0.006);
+    g.add(lid);
+    var browBar = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.016, 0.014), hairM);
+    browBar.position.set(0, 0.052, 0.012);
+    g.add(browBar);
+    head.add(g);
+    return { g: g, lid: lid, brow: browBar, iris: iris };
+  }
+  var eyeL = eye(-1), eyeR = eye(1);
+
+  // ---- hair / beard / headwear ----
+  if (!cfg.bald) {
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(0.252, 0.10, 0.252), hairM);
+    cap.position.y = 0.125;
+    head.add(cap);
+    var backHair = new THREE.Mesh(new THREE.BoxGeometry(0.248, 0.16, 0.06), hairM);
+    backHair.position.set(0, 0.03, -0.106);
+    head.add(backHair);
+  }
+  if (cfg.beard) {
+    var beard = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.12, 0.075), mat(cfg.beardColor || cfg.hair || PAL.hairDark));
+    beard.position.set(0, -0.055, 0.145);
+    jaw.add(beard);
+  }
+  if (cfg.headwrap) {
+    var wrap = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.095, 0.27), mat(cfg.headwrap));
+    wrap.position.y = 0.145;
+    head.add(wrap);
+    var tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.05), mat(cfg.headwrap));
+    tail.position.set(0.09, 0.0, -0.12);
+    head.add(tail);
+  }
+  if (cfg.helmet) {
+    var helm = new THREE.Mesh(new THREE.BoxGeometry(0.265, 0.13, 0.265), mat(PAL.armour));
+    helm.position.y = 0.135;
+    head.add(helm);
+    var crest = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.085, 0.24), mat(PAL.armourLit));
+    crest.position.y = 0.21;
+    head.add(crest);
+  }
+
+  // ---- arms ----
+  function arm(side) {
+    var sh = new THREE.Group();
+    sh.position.set(side * 0.255 * build, 0.30, 0);
+    chest.add(sh);
+    var upper = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.30, 0.095), cloth);
+    upper.position.y = -0.15;
+    upper.castShadow = true;
+    sh.add(upper);
+    var el = new THREE.Group();
+    el.position.y = -0.30;
+    sh.add(el);
+    var fore = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.28, 0.082), skin);
+    fore.position.y = -0.14;
+    fore.castShadow = true;
+    el.add(fore);
+    var hand = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.10, 0.075), skin);
+    hand.position.y = -0.31;
+    el.add(hand);
+    sh.rotation.z = side * 0.09;
+    return { sh: sh, el: el, hand: hand };
+  }
+  var armL = arm(-1), armR = arm(1);
+  if (watch) armL.el.add(watch);     // worn on the left wrist
+
+  // ---- legs (hidden under the robe but they carry the walk) ----
+  function leg(side) {
+    var hip = new THREE.Group();
+    hip.position.set(side * 0.115, 0.0, 0);
+    hips.add(hip);
+    var thigh = new THREE.Mesh(new THREE.BoxGeometry(0.125, 0.42, 0.13), under);
+    thigh.position.y = -0.21;
+    hip.add(thigh);
+    var knee = new THREE.Group();
+    knee.position.y = -0.42;
+    hip.add(knee);
+    var shin = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.42, 0.11), under);
+    shin.position.y = -0.21;
+    knee.add(shin);
+    var foot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.055, 0.225), mat(PAL.leather));
+    foot.position.set(0, -0.45, 0.045);
+    knee.add(foot);
+    return { hip: hip, knee: knee, foot: foot };
+  }
+  var legL = leg(-1), legR = leg(1);
+
+  return {
+    root: P, hips: hips, torso: torso, chest: chest, neck: neck, head: head,
+    jaw: jaw, mouth: mouth, brow: brow, eyeL: eyeL, eyeR: eyeR,
+    armL: armL, armR: armR, legL: legL, legR: legR, robe: robe,
+    jacket: jacket, watch: watch,
+    // per-character animation state, eased toward targets every frame
+    s: {
+      lean: 0, slump: 0, headDown: 0, headTurn: 0, headTilt: 0,
+      browAngle: 0, browRaise: 0, lidDrop: 0, jawOpen: 0,
+      armUpL: 0, armUpR: 0, reach: 0, point: 0, shield: 0,
+      kneel: 0, fallen: 0, walk: 0, walkPhase: 0, talking: 0,
+      blinkT: rnd() * 3, breathT: rnd() * 6.28, sway: rnd() * 6.28
+    }
+  };
+}
+
+
+// ===== animations/perform.js ===================================
+// animations/perform.js — what makes a figure look alive.
+//
+// Two layers. Involuntary motion (breath, blink, weight shift, the drift of a
+// head) runs on its own timers and never stops, so nobody is ever a statue.
+// Voluntary motion (point, shield, kneel, reach, walk) is a set of 0..1 targets
+// that beats set and this module eases toward, so a cut never catches a body
+// mid-snap.
+
+function ease(cur, target, rate, dt) {
+  return cur + (target - cur) * (1 - Math.exp(-rate * dt));
+}
+
+// Mouths open only while their own line is being spoken. There is no forced
+// aligner on this machine, so this is a speech ENVELOPE, not visemes: the jaw
+// rides a fast carrier (syllable-rate) under a slower amplitude curve, and
+// closes in the measured pauses inside the line. It reads correctly at these
+// shot sizes; it is not phoneme-matched, and the storyboard says so.
+function jawEnvelope(t, lineT, lineD, seed) {
+  if (lineT === null || t < lineT || t > lineT + lineD) return 0;
+  var u = (t - lineT) / Math.max(0.0001, lineD);
+  // taper in and out so a line does not begin or end with a snapped jaw
+  var amp = Math.min(1, Math.min(u, 1 - u) * 9);
+  var carrier = 0.5 + 0.5 * Math.sin((t + seed) * 15.5);
+  var slow = 0.55 + 0.45 * Math.sin((t * 2.3 + seed) * 1.7);
+  return amp * carrier * slow;
+}
+
+function animatePerson(c, t, dt) {
+  var s = c.s;
+
+  // ---- involuntary ----
+  s.breathT += dt * (0.95 + s.talking * 0.5 + s.fallen * 0.9);
+  var breath = Math.sin(s.breathT) * 0.5 + 0.5;
+  c.chest.scale.set(1 + breath * 0.022, 1 + breath * 0.016, 1 + breath * 0.026);
+  c.chest.position.y = 0.26 + breath * 0.009;
+
+  s.sway += dt * 0.37;
+  var sway = Math.sin(s.sway) * 0.012 + Math.sin(s.sway * 0.41) * 0.008;
+
+  s.blinkT -= dt;
+  var blink = 0;
+  if (s.blinkT < 0) {
+    blink = Math.min(1, -s.blinkT * 11);
+    if (s.blinkT < -0.14) { s.blinkT = 2.1 + rnd() * 3.4; }
+  }
+
+  // ---- spine ----
+  var leanA = s.lean * 0.21 + s.fallen * 0.1;
+  c.torso.rotation.x = ease(c.torso.rotation.x, leanA - s.slump * 0.05, 7, dt);
+  c.torso.rotation.z = ease(c.torso.rotation.z, sway + s.fallen * 0.14, 5, dt);
+  c.chest.rotation.x = ease(c.chest.rotation.x, s.slump * 0.17, 6, dt);
+
+  // ---- head ----
+  var hd = s.headDown * 0.34 + s.slump * 0.1 - s.browRaise * 0.05;
+  c.neck.rotation.x = ease(c.neck.rotation.x, hd, 7, dt);
+  c.head.rotation.y = ease(c.head.rotation.y, s.headTurn * 0.5, 6, dt);
+  c.head.rotation.z = ease(c.head.rotation.z, s.headTilt * 0.22 + sway * 0.5, 6, dt);
+  c.head.rotation.x = ease(c.head.rotation.x, Math.sin(s.breathT * 0.31) * 0.012, 4, dt);
+
+  // ---- face ----
+  c.jaw.rotation.x = ease(c.jaw.rotation.x, s.jawOpen * 0.30, 26, dt);
+  c.mouth.scale.y = 1 + s.jawOpen * 2.2;
+
+  // lids: blink, plus the heavy half-lidded look of the blind stretch
+  var lidY = 0.044 - (blink * 0.046) - (s.lidDrop * 0.030);
+  c.eyeL.lid.position.y = ease(c.eyeL.lid.position.y, lidY, 24, dt);
+  c.eyeR.lid.position.y = c.eyeL.lid.position.y;
+
+  // brows do the emotional work: angry drives the inner ends down, fear up
+  var bz = s.browAngle * 0.42;
+  c.eyeL.brow.rotation.z = ease(c.eyeL.brow.rotation.z, -bz, 10, dt);
+  c.eyeR.brow.rotation.z = ease(c.eyeR.brow.rotation.z, bz, 10, dt);
+  var by = 0.052 + s.browRaise * 0.022 - Math.max(0, s.browAngle) * 0.012;
+  c.eyeL.brow.position.y = ease(c.eyeL.brow.position.y, by, 10, dt);
+  c.eyeR.brow.position.y = c.eyeL.brow.position.y;
+
+  // eyes go dead during blindness - no iris tracking, nothing to track with
+  var irisZ = 0.004 - s.lidDrop * 0.002;
+  c.eyeL.iris.position.z = irisZ;
+  c.eyeR.iris.position.z = irisZ;
+
+  // ---- arms ----
+  // shield: both forearms up across the face, the Damascus-road gesture
+  var shL = -s.armUpL * 1.5 - s.shield * 2.25 - s.reach * 1.35 - s.point * 0.2;
+  var shR = -s.armUpR * 1.5 - s.shield * 2.25 - s.reach * 1.35 - s.point * 1.6;
+  c.armL.sh.rotation.x = ease(c.armL.sh.rotation.x, shL, 8, dt);
+  c.armR.sh.rotation.x = ease(c.armR.sh.rotation.x, shR, 8, dt);
+  c.armL.sh.rotation.z = ease(c.armL.sh.rotation.z, -0.09 - s.shield * 0.5 + s.reach * 0.22, 8, dt);
+  c.armR.sh.rotation.z = ease(c.armR.sh.rotation.z, 0.09 + s.shield * 0.5 - s.reach * 0.22 - s.point * 0.3, 8, dt);
+  c.armL.el.rotation.x = ease(c.armL.el.rotation.x, -s.shield * 1.5 - s.armUpL * 0.7 - s.reach * 0.25, 8, dt);
+  c.armR.el.rotation.x = ease(c.armR.el.rotation.x, -s.shield * 1.5 - s.armUpR * 0.7 - s.reach * 0.25 - s.point * 0.1, 8, dt);
+
+  // talking gesture: the forward hand lifts a little on stressed syllables
+  if (s.talking > 0.01 && s.shield < 0.1 && s.reach < 0.1) {
+    var g = Math.sin(t * 3.1) * 0.5 + 0.5;
+    c.armR.sh.rotation.x -= s.talking * g * 0.26;
+    c.armR.el.rotation.x -= s.talking * g * 0.2;
+  }
+
+  // ---- legs: walk cycle, kneel, collapse ----
+  if (s.walk > 0.01) {
+    s.walkPhase += dt * 4.6 * s.walk;
+    var w = s.walkPhase;
+    c.legL.hip.rotation.x = Math.sin(w) * 0.55 * s.walk;
+    c.legR.hip.rotation.x = Math.sin(w + Math.PI) * 0.55 * s.walk;
+    c.legL.knee.rotation.x = Math.max(0, -Math.sin(w - 0.6)) * 0.72 * s.walk;
+    c.legR.knee.rotation.x = Math.max(0, -Math.sin(w + Math.PI - 0.6)) * 0.72 * s.walk;
+    // the body rises and falls on the stride, which is what sells a walk
+    c.hips.position.y = 0.92 + Math.abs(Math.sin(w)) * 0.028 * s.walk;
+    c.armL.sh.rotation.x += Math.sin(w + Math.PI) * 0.3 * s.walk;
+    c.armR.sh.rotation.x += Math.sin(w) * 0.3 * s.walk;
+  } else {
+    c.legL.hip.rotation.x = ease(c.legL.hip.rotation.x, s.kneel * -1.45, 7, dt);
+    c.legR.hip.rotation.x = ease(c.legR.hip.rotation.x, s.kneel * -0.3, 7, dt);
+    c.legL.knee.rotation.x = ease(c.legL.knee.rotation.x, s.kneel * 1.5, 7, dt);
+    c.legR.knee.rotation.x = ease(c.legR.knee.rotation.x, s.kneel * 1.5, 7, dt);
+    c.hips.position.y = ease(c.hips.position.y,
+      0.92 - s.kneel * 0.42 - s.fallen * 0.66, 6, dt);
+  }
+
+  // a fallen body pitches forward onto its hands
+  c.root.rotation.x = ease(c.root.rotation.x, s.fallen * 0.3, 5, dt);
+}
+
+
+// ===== environments/sets.js ====================================
+// environments/sets.js — the film's six locations.
+//
+// Continuity rule from the brief: the office tower the film opens on is one
+// of the towers visible from the street and from both homes, so the city is
+// a single consistent skyline seen from different windows. buildSkyline() is
+// therefore shared, with a seeded layout that does not change between sets.
+
+// ------------------------------------------------------------- shared city
+
+var SKYLINE_SEED = 20261118;
+
+function skylineRnd(state) {
+  state.v = (state.v * 1103515245 + 12345) & 0x7fffffff;
+  return state.v / 0x7fffffff;
+}
+
+// One deterministic skyline, reused by every set that can see the city, so
+// the same towers appear from the office, both homes and the street.
+function buildSkyline(opts) {
+  opts = opts || {};
+  var G = new THREE.Group();
+  var st = { v: SKYLINE_SEED };
+  var cols = [PAL.towerA, PAL.towerB, PAL.towerC, PAL.towerFar];
+  var n = opts.count || 70;
+  for (var i = 0; i < n; i++) {
+    var w = 3 + skylineRnd(st) * 7;
+    var d = 3 + skylineRnd(st) * 7;
+    var h = 8 + skylineRnd(st) * 52;
+    var band = Math.floor(skylineRnd(st) * 4);
+    var b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(cols[band]));
+    var ang = skylineRnd(st) * Math.PI * 2;
+    var rad = 45 + skylineRnd(st) * 190;
+    b.position.set(Math.sin(ang) * rad, h / 2, -Math.abs(Math.cos(ang)) * rad - 30);
+    G.add(b);
+
+    // lit windows: a single emissive slab per face reads better at distance
+    // than hundreds of quads, and costs one draw call
+    if (opts.lit) {
+      var winM = new THREE.MeshBasicMaterial({
+        color: 0xffd9a0, transparent: true,
+        opacity: 0.25 + skylineRnd(st) * 0.5
+      });
+      var win = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.82, h * 0.86), winM);
+      win.position.set(b.position.x, b.position.y, b.position.z + d / 2 + 0.06);
+      G.add(win);
+    }
+  }
+  return G;
+}
+
+function groundPlane(size, col) {
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat(col));
+  m.rotation.x = -Math.PI / 2;
+  m.receiveShadow = true;
+  return m;
+}
+
+function framedPhoto(w, h) {
+  // The family photograph: the film's recurring object. Deliberately
+  // abstract - two adults and a child as flat shapes, never a face, because
+  // a legible rendered face at this scale would look worse than a suggestion.
+  var G = new THREE.Group();
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), mat(0x3a2f26));
+  G.add(frame);
+  var img = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.84, h * 0.84), mat(0x9ab0c0));
+  img.position.z = 0.012;
+  G.add(img);
+  var figs = [[-0.26, 0.52, 0x4a5668], [0.26, 0.52, 0xb88ca0], [0, 0.40, 0x7a8f6a]];
+  for (var i = 0; i < figs.length; i++) {
+    var body = new THREE.Mesh(
+      new THREE.BoxGeometry(w * 0.17, h * figs[i][1] * 0.42, 0.01), mat(figs[i][2]));
+    body.position.set(w * figs[i][0], -h * 0.08, 0.016);
+    G.add(body);
+    var head = new THREE.Mesh(new THREE.BoxGeometry(w * 0.1, w * 0.1, 0.01),
+                              mat(PAL.skinA));
+    head.position.set(w * figs[i][0], -h * 0.08 + h * figs[i][1] * 0.26, 0.016);
+    G.add(head);
+  }
+  return G;
+}
+
+function officeChair() {
+  var G = new THREE.Group();
+  var seat = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.54), mat(PAL.leatherChair));
+  seat.position.y = 0.46;
+  seat.castShadow = true;
+  G.add(seat);
+  var back = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.62, 0.09), mat(PAL.leatherChair));
+  back.position.set(0, 0.8, -0.24);
+  back.castShadow = true;
+  G.add(back);
+  var post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.42, 6), mat(PAL.steelDark));
+  post.position.y = 0.23;
+  G.add(post);
+  for (var i = 0; i < 5; i++) {
+    var a = (i / 5) * Math.PI * 2;
+    var leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.3), mat(PAL.steelDark));
+    leg.position.set(Math.sin(a) * 0.15, 0.04, Math.cos(a) * 0.15);
+    leg.rotation.y = a;
+    G.add(leg);
+  }
+  return G;
+}
+
+// ------------------------------------------------------ 1/2: the office
+
+function buildOffice() {
+  var S = new THREE.Group();
+
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(18, 15), mat(PAL.stoneFloor));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  S.add(floor);
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(18, 15), mat(0xe4e2de));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 3.5;
+  S.add(ceil);
+
+  // floor-to-ceiling glass along the front and right
+  var mull = mat(PAL.steelDark);
+  for (var g = 0; g < 9; g++) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.5, 0.1), mull);
+    post.position.set(-8 + g * 2, 1.75, 5.2);
+    S.add(post);
+  }
+  var glassF = new THREE.Mesh(new THREE.PlaneGeometry(17.6, 3.5),
+    new THREE.MeshLambertMaterial({ color: PAL.glass, transparent: true,
+                                    opacity: 0.17, flatShading: true,
+                                    side: THREE.DoubleSide }));
+  glassF.position.set(0, 1.75, 5.22);
+  S.add(glassF);
+
+  // back and left walls, panelled
+  var back = new THREE.Mesh(new THREE.PlaneGeometry(18, 3.5), mat(0xd8d4ce));
+  back.position.set(0, 1.75, -7);
+  back.receiveShadow = true;
+  S.add(back);
+  var leftW = new THREE.Mesh(new THREE.PlaneGeometry(12.2, 3.5), mat(0xcdc8c2));
+  leftW.position.set(-8.8, 1.75, -0.9);
+  leftW.rotation.y = Math.PI / 2;
+  leftW.receiveShadow = true;
+  S.add(leftW);
+
+  // the desk
+  var desk = new THREE.Group();
+  var top = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.09, 1.2), mat(PAL.deskTop));
+  top.position.y = 0.74;
+  top.castShadow = true;
+  desk.add(top);
+  for (var dl = -1; dl <= 1; dl += 2) {
+    var sideP = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.74, 1.1), mat(PAL.deskWoodDark));
+    sideP.position.set(dl * 1.28, 0.37, 0);
+    desk.add(sideP);
+  }
+  var modesty = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.5, 0.07), mat(PAL.deskWood));
+  modesty.position.set(0, 0.46, -0.52);
+  desk.add(modesty);
+  desk.position.set(0.2, 0, -2.4);
+  S.add(desk);
+
+  var lap = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.3), mat(0x2a2e34));
+  lap.position.set(-0.2, 0.80, -2.3);
+  S.add(lap);
+  var lapScr = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.02), mat(PAL.screenLit));
+  lapScr.position.set(-0.2, 0.94, -2.45);
+  lapScr.rotation.x = -0.25;
+  S.add(lapScr);
+  for (var pp = 0; pp < 5; pp++) {
+    var pap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.004, 0.3), mat(0xf4f2ee));
+    pap.position.set(0.75 + pp * 0.012, 0.787 + pp * 0.005, -2.35 + pp * 0.01);
+    pap.rotation.y = (pp - 2) * 0.03;
+    S.add(pap);
+  }
+
+  var chair = officeChair();
+  chair.position.set(0.2, 0, -3.5);
+  chair.rotation.y = Math.PI;
+  S.add(chair);
+
+  // presentation screen and shelving on the back wall
+  var scr = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 0.1), mat(PAL.screen));
+  scr.position.set(-4.4, 1.9, -6.9);
+  S.add(scr);
+  var scrGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.62), mat(PAL.screenLit));
+  scrGlow.position.set(-4.4, 1.9, -6.83);
+  S.add(scrGlow);
+
+  for (var sh = 0; sh < 4; sh++) {
+    var shelf = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.07, 0.34), mat(PAL.shelf));
+    shelf.position.set(4.6, 0.6 + sh * 0.58, -6.8);
+    S.add(shelf);
+    for (var bk = 0; bk < 9; bk++) {
+      var book = new THREE.Mesh(
+        new THREE.BoxGeometry(0.07 + (bk % 3) * 0.02, 0.26 + (bk % 4) * 0.03, 0.22),
+        mat([0x6a3a3a, 0x3a4a6a, 0x4a5a3a, 0x6a5a3a][bk % 4]));
+      book.position.set(3.55 + bk * 0.13, 0.77 + sh * 0.58 + (bk % 4) * 0.015, -6.8);
+      S.add(book);
+    }
+  }
+
+  var art = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.05, 0.06), mat(PAL.artA));
+  art.position.set(-8.72, 2.0, -2.2);
+  art.rotation.y = Math.PI / 2;
+  S.add(art);
+
+  // a plant, because every office has one
+  var pot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.42, 8), mat(PAL.plantPot));
+  pot.position.set(-7.4, 0.21, 3.2);
+  S.add(pot);
+  for (var lf = 0; lf < 7; lf++) {
+    var leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), mat(PAL.plant));
+    leaf.position.set(-7.4 + (lf % 3 - 1) * 0.22, 0.62 + lf * 0.1, 3.2 + (lf % 2 - 0.5) * 0.2);
+    leaf.scale.y = 0.7;
+    S.add(leaf);
+  }
+
+  var conf = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.08, 1.4), mat(PAL.deskTop));
+  conf.position.set(5.4, 0.75, 1.6);
+  conf.castShadow = true;
+  S.add(conf);
+  for (var cl = 0; cl < 4; cl++) {
+    var cleg = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.75, 0.09), mat(PAL.deskWoodDark));
+    cleg.position.set(5.4 + (cl % 2 ? 1.5 : -1.5), 0.375, 1.6 + (cl < 2 ? 0.55 : -0.55));
+    S.add(cleg);
+  }
+  for (var cc = 0; cc < 4; cc++) {
+    var cch = officeChair();
+    cch.scale.setScalar(0.92);
+    cch.position.set(5.4 + (cc % 2 ? 1.1 : -1.1), 0, 1.6 + (cc < 2 ? 1.2 : -1.2));
+    cch.rotation.y = cc < 2 ? Math.PI : 0;
+    S.add(cch);
+  }
+
+  S.add(buildSkyline({ count: 70 }));
+  S.visible = false;
+  return S;
+}
+
+// ------------------------------------------------------- 4: the hospital
+
+function buildHospital() {
+  var S = new THREE.Group();
+  S.add(groundPlane(40, PAL.hospFloor));
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(30, 24), mat(0xeef2f4));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 3.0;
+  S.add(ceil);
+
+  // corridor walls with a coloured trim line
+  for (var sd = -1; sd <= 1; sd += 2) {
+    var w = new THREE.Mesh(new THREE.PlaneGeometry(22, 3.0), mat(PAL.hospWall));
+    w.position.set(sd * 4.6, 1.5, -3);
+    w.rotation.y = -sd * Math.PI / 2;
+    w.receiveShadow = true;
+    S.add(w);
+    var trim = new THREE.Mesh(new THREE.BoxGeometry(22, 0.1, 0.04), mat(PAL.hospTrim));
+    trim.position.set(sd * 4.56, 0.95, -3);
+    trim.rotation.y = -sd * Math.PI / 2;
+    S.add(trim);
+  }
+  var endW = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 3.0), mat(PAL.hospWallLo));
+  endW.position.set(0, 1.5, -14);
+  S.add(endW);
+
+  // fluorescent panels - the scene's only light source
+  var panels = [];
+  for (var fp = 0; fp < 7; fp++) {
+    var pan = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.5),
+      new THREE.MeshBasicMaterial({ color: PAL.fluoro }));
+    pan.rotation.x = Math.PI / 2;
+    pan.position.set(0, 2.97, 1 - fp * 2.2);
+    S.add(pan);
+    panels.push(pan);
+  }
+
+  // double doors at the end
+  for (var dd = -1; dd <= 1; dd += 2) {
+    var door = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.2, 0.08), mat(0xc8d6de));
+    door.position.set(dd * 0.5, 1.1, -13.9);
+    S.add(door);
+    var win = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.1), mat(0x8fb0c4));
+    win.position.set(dd * 0.5, 1.7, -13.86);
+    S.add(win);
+  }
+
+  // reception desk
+  var rec = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.05, 0.7), mat(0xdfe6ea));
+  rec.position.set(-3.1, 0.52, -7.5);
+  rec.castShadow = true;
+  S.add(rec);
+  var recTop = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.07, 0.85), mat(PAL.hospTrim));
+  recTop.position.set(-3.1, 1.08, -7.5);
+  S.add(recTop);
+
+  // waiting chairs in a row
+  for (var wc = 0; wc < 5; wc++) {
+    var seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.48), mat(PAL.hospChair));
+    seat.position.set(3.3, 0.45, -1.2 - wc * 0.62);
+    seat.castShadow = true;
+    S.add(seat);
+    var bk2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.07), mat(PAL.hospChair));
+    bk2.position.set(3.58, 0.72, -1.2 - wc * 0.62);
+    bk2.rotation.z = -0.12;
+    S.add(bk2);
+    for (var lg2 = -1; lg2 <= 1; lg2 += 2) {
+      var l2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.45, 0.05), mat(PAL.steelDark));
+      l2.position.set(3.3 + lg2 * 0.2, 0.22, -1.2 - wc * 0.62);
+      S.add(l2);
+    }
+  }
+
+  // a medical cart, and signage
+  var cart = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.4), mat(0xdfe4e8));
+  cart.position.set(-3.6, 0.4, -2.0);
+  cart.castShadow = true;
+  S.add(cart);
+  var sign = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.26, 0.04), mat(PAL.hospTrim));
+  sign.position.set(0, 2.5, -13.8);
+  S.add(sign);
+
+  S.visible = false;
+  S.userData.panels = panels;
+  return S;
+}
+
+// ------------------------------------------- 5: the luxury residence (night)
+
+function buildResidence() {
+  var S = new THREE.Group();
+  S.add(groundPlane(30, PAL.homeFloor));
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(20, 16), mat(0xbfb8ae));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 3.2;
+  S.add(ceil);
+
+  // the panoramic window wall, looking at the city
+  for (var g = 0; g < 7; g++) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 3.2, 0.09), mat(PAL.steelDark));
+    post.position.set(-6 + g * 2, 1.6, 4.6);
+    S.add(post);
+  }
+  var pane = new THREE.Mesh(new THREE.PlaneGeometry(13, 3.2),
+    new THREE.MeshLambertMaterial({ color: PAL.glassDark, transparent: true,
+                                    opacity: 0.2, flatShading: true,
+                                    side: THREE.DoubleSide }));
+  pane.position.set(0, 1.6, 4.62);
+  S.add(pane);
+
+  var back = new THREE.Mesh(new THREE.PlaneGeometry(16, 3.2), mat(PAL.homeWall));
+  back.position.set(0, 1.6, -6);
+  back.receiveShadow = true;
+  S.add(back);
+  var leftW = new THREE.Mesh(new THREE.PlaneGeometry(10.6, 3.2), mat(PAL.homeWallDark));
+  leftW.position.set(-7, 1.6, -0.7);
+  leftW.rotation.y = Math.PI / 2;
+  S.add(leftW);
+
+  // couch, facing the window
+  var couch = new THREE.Group();
+  var cseat = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.42, 0.95), mat(PAL.couch));
+  cseat.position.y = 0.33;
+  cseat.castShadow = true;
+  couch.add(cseat);
+  var cback = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.62, 0.24), mat(PAL.couchDark));
+  cback.position.set(0, 0.74, -0.46);
+  couch.add(cback);
+  for (var ca = -1; ca <= 1; ca += 2) {
+    var arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.95), mat(PAL.couchDark));
+    arm2.position.set(ca * 1.37, 0.47, 0);
+    couch.add(arm2);
+  }
+  couch.position.set(-0.6, 0, 0.4);
+  S.add(couch);
+
+  var rug = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 3.0), mat(PAL.rugHome));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(-0.4, 0.014, 1.5);
+  S.add(rug);
+
+  var cof = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.7), mat(PAL.deskWood));
+  cof.position.set(-0.5, 0.42, 1.8);
+  cof.castShadow = true;
+  S.add(cof);
+
+  // kitchen counter along the back
+  var counter = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.95, 0.7), mat(PAL.counter));
+  counter.position.set(4.0, 0.47, -5.4);
+  counter.castShadow = true;
+  S.add(counter);
+  var ctop = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.07, 0.8), mat(0xb8b2a8));
+  ctop.position.set(4.0, 0.98, -5.4);
+  S.add(ctop);
+
+  var dine = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 1.1), mat(PAL.deskTop));
+  dine.position.set(4.2, 0.76, -2.6);
+  S.add(dine);
+  for (var dlg = 0; dlg < 4; dlg++) {
+    var dl2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.76, 0.08), mat(PAL.deskWoodDark));
+    dl2.position.set(4.2 + (dlg % 2 ? 0.85 : -0.85), 0.38, -2.6 + (dlg < 2 ? 0.42 : -0.42));
+    S.add(dl2);
+  }
+
+  // table lamps: the only warm light in the scene
+  var lamps = [];
+  var lp = [[-2.6, 0.62, -0.4], [3.4, 1.12, -5.0]];
+  for (var li = 0; li < lp.length; li++) {
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.3, 7), mat(0x3a3a40));
+    base.position.set(lp[li][0], lp[li][1], lp[li][2]);
+    S.add(base);
+    var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.24, 9),
+      new THREE.MeshBasicMaterial({ color: PAL.lampWarm, transparent: true, opacity: 0.85 }));
+    shade.position.set(lp[li][0], lp[li][1] + 0.26, lp[li][2]);
+    S.add(shade);
+    lamps.push({ pos: [lp[li][0], lp[li][1] + 0.26, lp[li][2]], shade: shade });
+  }
+
+  var photo = framedPhoto(0.34, 0.26);
+  photo.position.set(1.9, 1.12, -5.9);
+  S.add(photo);
+  var art2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.9, 0.05), mat(PAL.artB));
+  art2.position.set(-3.4, 2.0, -5.95);
+  S.add(art2);
+
+  S.add(buildSkyline({ count: 70, lit: true }));
+
+  // rain: vertical streaks outside the glass, animated by the frame loop
+  var rainCount = 700;
+  var rgeo = new THREE.BufferGeometry();
+  var rpos = new Float32Array(rainCount * 3);
+  var rseed = [];
+  for (var ri = 0; ri < rainCount; ri++) {
+    var rx = (rnd() - 0.5) * 26, ry = rnd() * 14, rz = 5 + rnd() * 16;
+    rpos[ri * 3] = rx; rpos[ri * 3 + 1] = ry; rpos[ri * 3 + 2] = rz;
+    rseed.push({ x: rx, y: ry, z: rz, s: 5 + rnd() * 6 });
+  }
+  rgeo.setAttribute('position', new THREE.BufferAttribute(rpos, 3));
+  var rain = new THREE.Points(rgeo, new THREE.PointsMaterial({
+    color: PAL.rain, size: 0.07, transparent: true, opacity: 0.5,
+    depthWrite: false, sizeAttenuation: true
+  }));
+  S.add(rain);
+
+  S.visible = false;
+  S.userData.lamps = lamps;
+  S.userData.rain = { pts: rain, geo: rgeo, pos: rpos, seed: rseed, count: rainCount };
+  return S;
+}
+
+// ------------------------------------------- 6-11: the modest apartment
+
+function buildApartment() {
+  var S = new THREE.Group();
+  S.add(groundPlane(22, PAL.aptFloor));
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(9, 8), mat(0xb8b2a6));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = 2.5;
+  S.add(ceil);
+
+  var back = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.5), mat(PAL.aptWall));
+  back.position.set(0, 1.25, -3.6);
+  back.receiveShadow = true;
+  S.add(back);
+  var leftW = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.5), mat(PAL.aptWallDark));
+  leftW.position.set(-4.4, 1.25, -0.1);
+  leftW.rotation.y = Math.PI / 2;
+  leftW.receiveShadow = true;
+  S.add(leftW);
+  var rightW = new THREE.Mesh(new THREE.PlaneGeometry(7.4, 2.5), mat(PAL.aptWall));
+  rightW.position.set(4.4, 1.25, -0.1);
+  rightW.rotation.y = -Math.PI / 2;
+  rightW.receiveShadow = true;
+  S.add(rightW);
+
+  // the small window: this film's counterpart to the office glass
+  var wf = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.3, 0.1), mat(0x8a8274));
+  wf.position.set(1.6, 1.5, -3.56);
+  S.add(wf);
+  var wg = new THREE.Mesh(new THREE.PlaneGeometry(1.34, 1.14), mat(PAL.nightSky));
+  wg.position.set(1.6, 1.5, -3.49);
+  S.add(wg);
+  var curtL = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.5, 0.05), mat(PAL.curtain));
+  curtL.position.set(0.72, 1.5, -3.46);
+  S.add(curtL);
+  var curtR = curtL.clone();
+  curtR.position.x = 2.48;
+  S.add(curtR);
+
+  // couch
+  var couch = new THREE.Group();
+  var cs = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.38, 0.85), mat(PAL.aptCouch));
+  cs.position.y = 0.3;
+  cs.castShadow = true;
+  couch.add(cs);
+  var cb = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.56, 0.2), mat(PAL.aptCouchDark));
+  cb.position.set(0, 0.67, -0.4);
+  couch.add(cb);
+  for (var a = -1; a <= 1; a += 2) {
+    var ar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.44, 0.85), mat(PAL.aptCouchDark));
+    ar.position.set(a * 1.1, 0.42, 0);
+    couch.add(ar);
+  }
+  couch.position.set(-1.1, 0, -1.6);
+  couch.rotation.y = 0.22;
+  S.add(couch);
+
+  // a second chair, for the friend
+  var chair = new THREE.Group();
+  var chs = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.36, 0.6), mat(PAL.aptCouch));
+  chs.position.y = 0.3;
+  chs.castShadow = true;
+  chair.add(chs);
+  var chb = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.54, 0.16), mat(PAL.aptCouchDark));
+  chb.position.set(0, 0.63, -0.28);
+  chair.add(chb);
+  chair.position.set(1.9, 0, -0.5);
+  chair.rotation.y = -0.85;
+  S.add(chair);
+
+  var cof = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.58), mat(PAL.pine));
+  cof.position.set(0.1, 0.4, -0.65);
+  cof.castShadow = true;
+  S.add(cof);
+  for (var cl2 = 0; cl2 < 4; cl2++) {
+    var c2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), mat(PAL.deskWoodDark));
+    c2.position.set(0.1 + (cl2 % 2 ? 0.47 : -0.47), 0.2, -0.65 + (cl2 < 2 ? 0.22 : -0.22));
+    S.add(c2);
+  }
+
+  // kitchenette
+  var kc = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.88, 0.6), mat(0x9a9488));
+  kc.position.set(-3.0, 0.44, -3.2);
+  S.add(kc);
+  var kt = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.06, 0.66), mat(0x7a7468));
+  kt.position.set(-3.0, 0.9, -3.2);
+  S.add(kt);
+
+  // moving boxes - the evidence of the move, left unpacked
+  var boxes = [[3.3, -2.6, 0.55], [3.5, -1.9, 0.45], [-3.6, -1.4, 0.5], [3.1, -2.2, 0.4]];
+  for (var bi = 0; bi < boxes.length; bi++) {
+    var sz = boxes[bi][2];
+    var bx = new THREE.Mesh(new THREE.BoxGeometry(sz, sz * 0.8, sz),
+      mat(bi % 2 ? PAL.box : PAL.boxDark));
+    bx.position.set(boxes[bi][0], sz * 0.4, boxes[bi][1]);
+    bx.rotation.y = (bi - 1.5) * 0.2;
+    bx.castShadow = true;
+    S.add(bx);
+  }
+
+  // the photograph, moved from the big house to a small shelf
+  var shelf = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.22), mat(PAL.pine));
+  shelf.position.set(-2.4, 1.3, -3.5);
+  S.add(shelf);
+  var photo = framedPhoto(0.28, 0.22);
+  photo.position.set(-2.4, 1.44, -3.46);
+  S.userData.photo = photo;
+  S.add(photo);
+
+  var lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.26, 7), mat(0x55504a));
+  lampBase.position.set(-3.3, 1.03, -3.0);
+  S.add(lampBase);
+  var lampShade = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.2, 9),
+    new THREE.MeshBasicMaterial({ color: PAL.lampWarm, transparent: true, opacity: 0.85 }));
+  lampShade.position.set(-3.3, 1.26, -3.0);
+  S.add(lampShade);
+
+  S.visible = false;
+  S.userData.lamps = [{ pos: [-3.3, 1.26, -3.0], shade: lampShade }];
+  S.userData.window = wg;
+  return S;
+}
+
+// ------------------------------------------------------- 12: the street
+
+function buildStreet() {
+  var S = new THREE.Group();
+  S.add(groundPlane(200, PAL.asphalt));
+
+  // sidewalk both sides, road down the middle
+  for (var sd = -1; sd <= 1; sd += 2) {
+    var sw = new THREE.Mesh(new THREE.BoxGeometry(5, 0.16, 120), mat(PAL.sidewalk));
+    sw.position.set(sd * 6.5, 0.08, -40);
+    sw.receiveShadow = true;
+    S.add(sw);
+  }
+  for (var dash = 0; dash < 30; dash++) {
+    var d2 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 1.6), mat(0xc8c4b4));
+    d2.position.set(0, 0.02, 4 - dash * 4);
+    S.add(d2);
+  }
+
+  // shopfronts
+  for (var sh2 = 0; sh2 < 12; sh2++) {
+    var side = sh2 % 2 ? 1 : -1;
+    var h = 4 + (sh2 % 3) * 2.5;
+    var shop = new THREE.Mesh(new THREE.BoxGeometry(6, h, 7),
+      mat(sh2 % 2 ? PAL.shopA : PAL.shopB));
+    shop.position.set(side * 12.5, h / 2, -2 - Math.floor(sh2 / 2) * 9);
+    shop.castShadow = true;
+    shop.receiveShadow = true;
+    S.add(shop);
+    var win2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 4.4), mat(PAL.glassLit));
+    win2.position.set(side * 9.45, 1.4, -2 - Math.floor(sh2 / 2) * 9);
+    S.add(win2);
+    var awn = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 4.6),
+      mat(sh2 % 3 ? 0x8a4a42 : 0x3a5a6a));
+    awn.position.set(side * 8.7, 2.6, -2 - Math.floor(sh2 / 2) * 9);
+    awn.rotation.z = side * 0.12;
+    S.add(awn);
+  }
+
+  // street trees and lamp posts
+  for (var t = 0; t < 10; t++) {
+    var side2 = t % 2 ? 1 : -1;
+    var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 2.4, 6), mat(PAL.trunk));
+    tr.position.set(side2 * 5.2, 1.3, -4 - t * 7);
+    tr.castShadow = true;
+    S.add(tr);
+    for (var cl3 = 0; cl3 < 3; cl3++) {
+      var can = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 0), mat(PAL.treeGreen));
+      can.position.set(side2 * 5.2 + (cl3 - 1) * 0.45, 2.9 + cl3 * 0.3, -4 - t * 7 + (cl3 % 2) * 0.4);
+      can.castShadow = true;
+      S.add(can);
+    }
+    var lpst = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), mat(PAL.lampPost));
+    lpst.position.set(-side2 * 5.4, 2.1, -7 - t * 7);
+    S.add(lpst);
+    var head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.26), mat(PAL.lampPost));
+    head.position.set(-side2 * 5.4, 4.2, -7 - t * 7);
+    S.add(head);
+  }
+
+  // parked cars
+  var carCols = [PAL.carA, PAL.carB, PAL.carC];
+  for (var c3 = 0; c3 < 8; c3++) {
+    var side3 = c3 % 2 ? 1 : -1;
+    var car = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.62, 4.2), mat(carCols[c3 % 3]));
+    body.position.y = 0.62;
+    body.castShadow = true;
+    car.add(body);
+    var cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.52, 2.1), mat(carCols[c3 % 3]));
+    cab.position.set(0, 1.14, -0.2);
+    car.add(cab);
+    var gl = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.34, 2.0), mat(0x2a3038));
+    gl.position.set(0, 1.2, -0.2);
+    car.add(gl);
+    for (var wl = 0; wl < 4; wl++) {
+      var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 8), mat(0x1e1e22));
+      wh.rotation.z = Math.PI / 2;
+      wh.position.set((wl % 2 ? 0.88 : -0.88), 0.33, wl < 2 ? 1.35 : -1.35);
+      car.add(wh);
+    }
+    car.position.set(side3 * 3.6, 0, -5 - c3 * 8);
+    S.add(car);
+  }
+
+  S.add(buildSkyline({ count: 60 }));
+  S.visible = false;
+  return S;
+}
+
+
+// ===== lighting/moods.js =======================================
+// lighting/moods.js — the light carries the three phases.
+//
+// SUCCESS is warm, bright and high-key: big windows, sun across a stone
+// floor. SUFFERING drains the warmth out: cool fill, clinical fluorescent,
+// then blue-grey night with two small lamps. FAITH warms again, but only by
+// degrees and never back to the opening - the brief is explicit that this is
+// quiet determination, not a man restored to his old life.
+//
+// No strobing anywhere; every change eases over at least half a second.
+
+var MOODS = {
+  // ---- 1-2: the office ----
+  empire:    { sun: 2.9, sunCol: 0xffe6c0, amb: 1.05, ambSky: 0xcfe0f0, ambGnd: 0x9a9288,
+               fogN: 40, fogF: 260, fogCol: 0xc8d8e8, exp: 1.06,
+               skyTop: 0x7fb0e0, lamp: 0, rain: 0 },
+  cooling:   { sun: 2.1, sunCol: 0xe8dcc8, amb: 0.92, ambSky: 0xb4c0cc, ambGnd: 0x7f7a74,
+               fogN: 34, fogF: 220, fogCol: 0xb8c4d0, exp: 0.99,
+               skyTop: 0x7a95ad, lamp: 0, rain: 0 },
+  cold:      { sun: 1.5, sunCol: 0xcdd6e0, amb: 0.78, ambSky: 0x95a4b4, ambGnd: 0x6a6660,
+               fogN: 26, fogF: 180, fogCol: 0xa4b0bc, exp: 0.93,
+               skyTop: 0x6e8498, lamp: 0, rain: 0 },
+
+  // ---- 3: transit, overcast ----
+  transit:   { sun: 1.2, sunCol: 0xc8ccd2, amb: 0.88, ambSky: 0x9aa4ae, ambGnd: 0x6e6e70,
+               fogN: 22, fogF: 150, fogCol: 0x9aa4ae, exp: 0.95,
+               skyTop: 0x8a949e, lamp: 0, rain: 0 },
+
+  // ---- 4: the hospital. fluorescent, no warmth at all ----
+  clinical:  { sun: 0.35, sunCol: 0xdce8f0, amb: 1.18, ambSky: 0xe4f0f6, ambGnd: 0xa8b4bc,
+               fogN: 18, fogF: 60, fogCol: 0xcfdce4, exp: 0.97,
+               skyTop: 0xc0d0dc, lamp: 0, rain: 0 },
+  grief:     { sun: 0.25, sunCol: 0xcfdce4, amb: 0.95, ambSky: 0xc8d8e0, ambGnd: 0x8a949a,
+               fogN: 12, fogF: 42, fogCol: 0xb8c8d2, exp: 0.90,
+               skyTop: 0xb0c0cc, lamp: 0, rain: 0 },
+
+  // ---- 5: the luxury house at night, rain outside ----
+  nightHome: { sun: 0.10, sunCol: 0x6a80a8, amb: 0.34, ambSky: 0x3a4a66, ambGnd: 0x24242c,
+               fogN: 14, fogF: 70, fogCol: 0x222a38, exp: 0.86,
+               skyTop: 0x141a26, lamp: 1.5, rain: 1 },
+  nightCold: { sun: 0.06, sunCol: 0x5a7098, amb: 0.26, ambSky: 0x2e3a52, ambGnd: 0x1c1c22,
+               fogN: 11, fogF: 56, fogCol: 0x1a2230, exp: 0.82,
+               skyTop: 0x101620, lamp: 1.2, rain: 1 },
+
+  // ---- 6-8: the apartment, evening ----
+  aptDusk:   { sun: 0.55, sunCol: 0xc8a888, amb: 0.52, ambSky: 0x7a8496, ambGnd: 0x4a4238,
+               fogN: 13, fogF: 48, fogCol: 0x5a5e68, exp: 0.90,
+               skyTop: 0x4a5a70, lamp: 1.0, rain: 0 },
+  aptQuiet:  { sun: 0.40, sunCol: 0xbca088, amb: 0.46, ambSky: 0x6e7888, ambGnd: 0x423c34,
+               fogN: 12, fogF: 44, fogCol: 0x4e525c, exp: 0.88,
+               skyTop: 0x3e4c60, lamp: 1.1, rain: 0 },
+  aptHard:   { sun: 0.34, sunCol: 0xa89888, amb: 0.40, ambSky: 0x60697a, ambGnd: 0x383228,
+               fogN: 11, fogF: 40, fogCol: 0x464a54, exp: 0.85,
+               skyTop: 0x36424f, lamp: 1.0, rain: 0 },
+
+  // ---- 9-11: warmth returning, by degrees ----
+  aptWarm:   { sun: 0.70, sunCol: 0xd8b088, amb: 0.60, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
+               fogN: 15, fogF: 56, fogCol: 0x6a6258, exp: 0.94,
+               skyTop: 0x54596a, lamp: 1.2, rain: 0 },
+  aptHope:   { sun: 1.05, sunCol: 0xe8bc90, amb: 0.72, ambSky: 0x9a9690, ambGnd: 0x6a5842,
+               fogN: 18, fogF: 68, fogCol: 0x7e7264, exp: 0.98,
+               skyTop: 0x6e6a78, lamp: 1.0, rain: 0 },
+
+  // ---- 12: sunrise. warm, but not the opening's brightness ----
+  dawn:      { sun: 2.2, sunCol: 0xffb878, amb: 0.95, ambSky: 0xe8b090, ambGnd: 0x8a6a4e,
+               fogN: 28, fogF: 170, fogCol: 0xe0ae8a, exp: 1.04,
+               skyTop: 0xf0a878, lamp: 0, rain: 0 }
+};
+
+function buildLights(scene) {
+  var amb = new THREE.HemisphereLight(0xcfe0f0, 0x9a9288, 1.05);
+  scene.add(amb);
+
+  var sun = new THREE.DirectionalLight(0xffe6c0, 2.9);
+  sun.position.set(16, 26, 14);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 110;
+  sun.shadow.camera.left = -30;
+  sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30;
+  sun.shadow.camera.bottom = -30;
+  sun.shadow.bias = -0.0012;
+  scene.add(sun);
+
+  // interior practicals: the table lamps, and the hospital's ceiling wash
+  var lampA = new THREE.PointLight(PAL.lampGlow, 0, 7, 1.8);
+  var lampB = new THREE.PointLight(PAL.lampGlow, 0, 7, 1.8);
+  scene.add(lampA);
+  scene.add(lampB);
+
+  var fluoro = new THREE.DirectionalLight(PAL.fluoro, 0);
+  fluoro.position.set(0, 12, 2);
+  scene.add(fluoro);
+
+  scene.fog = new THREE.Fog(0xc8d8e8, 40, 260);
+
+  // Skydome: the interiors have big windows and the exteriors look at a
+  // horizon, so without geometry up there the frame shows the clear colour
+  // as a hard band. Horizon takes the fog colour so the ground never seams.
+  var skyGeo = new THREE.SphereGeometry(360, 18, 12);
+  var skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      top: { value: new THREE.Color(0x7fb0e0) },
+      bottom: { value: new THREE.Color(0xc8d8e8) }
+    },
+    vertexShader:
+      'varying float h;\n' +
+      'void main(){ vec4 w = modelMatrix * vec4(position,1.0);' +
+      ' h = normalize(w.xyz).y;' +
+      ' gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader:
+      'uniform vec3 top; uniform vec3 bottom; varying float h;\n' +
+      'void main(){ float m = clamp(h*1.5+0.18, 0.0, 1.0);' +
+      ' m = m*m*(3.0-2.0*m);' +
+      ' gl_FragColor = vec4(mix(bottom, top, m), 1.0); }'
+  });
+  var sky = new THREE.Mesh(skyGeo, skyMat);
+  sky.renderOrder = -1;
+  scene.add(sky);
+
+  return { amb: amb, sun: sun, lampA: lampA, lampB: lampB, fluoro: fluoro,
+           sky: sky, skyMat: skyMat };
+}
+
+
+// ===== cameras/solve.js ========================================
+// cameras/solve.js — shots computed from where people actually stand.
+//
+// Hand-typed camera coordinates drift out of agreement with staging the
+// moment a character moves, and the error is invisible until you look at a
+// rendered frame. (On the first Saul render: jSaulCU aimed at empty road
+// because Saul had moved, and jFearCU sat inside a building.) These helpers
+// derive a shot from a live subject instead, so staging and camera cannot
+// disagree.
+//
+// A derived shot is resolved every frame, so it also tracks a walking subject.
+
+var EYE = 1.62;           // eye height of an average figure, in world units
+
+// Where is this character's head right now, in world space?
+function headOf(c, out) {
+  if (!c) return out.set(0, EYE, 0);
+  c.head.getWorldPosition(out);
+  return out;
+}
+
+// A close-up: stand in FRONT of the subject's face at `dist`, offset by
+// `yaw` radians, looking at the head.
+//
+// The camera goes where the face is pointing, not behind the subject: a
+// figure's root rotation is its facing, so the camera must sit along +facing,
+// and `yaw` then swings it off-axis for a three-quarter view. Getting this
+// backwards puts the camera behind the head, which on the first pass filled a
+// third of the frame with the back of someone's skull while the speaker stood
+// small in the distance.
+//
+// `blockers` lists figures that must not come between camera and subject. If
+// one is close to the camera-subject line, the shot swings to the other side
+// rather than shooting through them. Cheap, and it catches the case that
+// hand-typed coordinates never could: someone having moved into the shot.
+function cu(subject, opts) {
+  opts = opts || {};
+  var vb = new THREE.Vector3();
+  return {
+    derive: function (t, v, look) {
+      headOf(subject, look);
+      var base = (subject ? subject.root.rotation.y : 0);
+      var yaw = base + (opts.yaw || 0);
+      var d = opts.dist || 2.6;
+
+      // does anyone stand near the line from here to the subject?
+      var flip = 1;
+      var list = opts.blockers;
+      if (list) {
+        for (var i = 0; i < list.length; i++) {
+          var o = list[i];
+          if (!o || o === subject || !o.root.visible) continue;
+          headOf(o, vb);
+          var cx = look.x + Math.sin(yaw) * d - vb.x;
+          var cz = look.z + Math.cos(yaw) * d - vb.z;
+          if (Math.sqrt(cx * cx + cz * cz) < 0.95) { flip = -1; break; }
+        }
+      }
+      yaw = base + (opts.yaw || 0) * flip;
+      v.set(look.x + Math.sin(yaw) * d,
+            look.y + (opts.rise === undefined ? 0.10 : opts.rise),
+            look.z + Math.cos(yaw) * d);
+      // Frame head and shoulders, not just a face: aim a little below the
+      // eyes so the skull is not clipped by the top of frame.
+      look.y -= 0.12;
+    },
+    fov: opts.fov || 27,
+    drift: opts.drift || [0.16, 0.08, 0.05]
+  };
+}
+
+// A two-shot: frame both subjects, backing off far enough to hold them both.
+function two(a, b, opts) {
+  opts = opts || {};
+  var vb = new THREE.Vector3();
+  return {
+    derive: function (t, v, look) {
+      headOf(a, v);
+      headOf(b, vb);
+      look.set((v.x + vb.x) / 2, (v.y + vb.y) / 2 - 0.08, (v.z + vb.z) / 2);
+      var sep = v.distanceTo(vb);
+      var yaw = (opts.yaw || 0) + Math.atan2(vb.x - v.x, vb.z - v.z) + Math.PI / 2;
+      var d = (opts.dist || 2.1) + sep * 0.55;
+      v.set(look.x + Math.sin(yaw) * d,
+            look.y + (opts.rise === undefined ? 0.28 : opts.rise),
+            look.z + Math.cos(yaw) * d);
+    },
+    fov: opts.fov || 34,
+    drift: opts.drift || [0.24, 0.1, 0.1]
+  };
+}
+
+// Over-the-shoulder: behind `near`, looking past them at `far`.
+function over(near, far, opts) {
+  opts = opts || {};
+  var vf = new THREE.Vector3();
+  return {
+    derive: function (t, v, look) {
+      headOf(near, v);
+      headOf(far, vf);
+      look.copy(vf);
+      var dx = vf.x - v.x, dz = vf.z - v.z;
+      var len = Math.max(0.001, Math.sqrt(dx * dx + dz * dz));
+      var back = opts.back || 1.0, side = opts.side === undefined ? 0.45 : opts.side;
+      v.x -= (dx / len) * back - (dz / len) * side;
+      v.z -= (dz / len) * back + (dx / len) * side;
+      v.y += opts.rise === undefined ? 0.22 : opts.rise;
+    },
+    fov: opts.fov || 33,
+    drift: opts.drift || [0.2, 0.09, 0.08]
+  };
+}
+
+// A wide that keeps the subject in frame from a fixed direction.
+function wideOn(subject, opts) {
+  opts = opts || {};
+  return {
+    derive: function (t, v, look) {
+      headOf(subject, v);
+      // Track the subject's own head height rather than a fixed world Y:
+      // a kneeling or fallen figure needs a lower aim than a standing one,
+      // and a fixed value crops whoever does not match it.
+      look.set(v.x, v.y - (opts.below === undefined ? 0.35 : opts.below), v.z);
+      if (opts.lookY !== undefined) look.y = opts.lookY;
+      var yaw = (opts.yaw || 0);
+      var d = opts.dist || 6.5;
+      v.set(look.x + Math.sin(yaw) * d,
+            opts.height === undefined ? 2.4 : opts.height,
+            look.z + Math.cos(yaw) * d);
+    },
+    fov: opts.fov || 40,
+    drift: opts.drift || [0.42, 0.16, 0.2]
+  };
+}
+
+// A low hero angle, looking up at the subject.
+function hero(subject, opts) {
+  opts = opts || {};
+  return {
+    derive: function (t, v, look) {
+      headOf(subject, v);
+      look.copy(v);
+      look.y += 0.1;
+      // in front of the face, like cu() - a hero angle shot from behind is
+      // just the back of a head seen from the floor
+      var yaw = (subject ? subject.root.rotation.y : 0) + (opts.yaw || 0);
+      var d = opts.dist || 3.1;
+      v.set(look.x + Math.sin(yaw) * d,
+            opts.height === undefined ? 0.85 : opts.height,
+            look.z + Math.cos(yaw) * d);
+    },
+    fov: opts.fov || 34,
+    drift: opts.drift || [0.18, 0.1, 0.08]
+  };
+}
+
+// Looking straight up from beside a fallen subject - the light overhead.
+function lookUp(subject, opts) {
+  opts = opts || {};
+  return {
+    derive: function (t, v, look) {
+      headOf(subject, v);
+      v.y += 0.1;
+      v.x += opts.dx || 0.9;
+      v.z += opts.dz || 0.8;
+      look.set(v.x * 0.2, (opts.lookY || 7.0), (v.z - 1.0));
+    },
+    fov: opts.fov || 46,
+    drift: opts.drift || [0.22, 0.1, 0.12]
+  };
+}
+
+// An orbit around a subject, from `from` to `to` radians across the beat.
+function orbitOn(subject, opts) {
+  opts = opts || {};
+  return {
+    derive: function (t, v, look, u) {
+      headOf(subject, look);
+      look.y -= opts.drop === undefined ? 0.2 : opts.drop;
+      var a = (opts.from || 0.7) + ((opts.to === undefined ? -0.5 : opts.to) - (opts.from || 0.7)) * smoothstep(u);
+      var r = opts.r || 4.2;
+      v.set(look.x + Math.sin(a) * r,
+            opts.height === undefined ? 2.1 : opts.height,
+            look.z + Math.cos(a) * r);
+    },
+    fov: opts.fov || 34,
+    drift: opts.drift || [0.2, 0.1, 0.1]
+  };
+}
+
+
+// ===== cameras/shots.js ========================================
+// cameras/shots.js — the camera system.
+//
+// Derived shots (from cameras/solve.js) resolve against live character
+// positions every frame. Fixed shots are used only where the frame is about
+// the PLACE: the opening aerial, the closing pull-back. Hand-typed
+// coordinates for anything involving a person go out of agreement with
+// staging the moment someone moves — that cost a whole render on the
+// previous film, so this one starts derived.
+
+var SHOTS = {};
+
+function buildShots(C) {
+  var S = {};
+  var BLOCK = [C.man, C.asst, C.wife, C.doc, C.friend];
+
+  // ---- 1-3: the office ----
+  // Aerial on the skyline, pushing to the tower and in through the glass.
+  S.oAerial  = { pos: [0, 34, 46], look: [0, 10, -20], fov: 46,
+                 drift: [0.5, 0.2, 0.3],
+                 path: [[6, 34, 54], [3, 14, 22], [0.6, 2.4, 4.2]] };
+  S.oManCU   = cu(C.man, { dist: 3.51, yaw: 0.42, fov: 27, blockers: BLOCK });
+  S.oAsstCU  = cu(C.asst, { dist: 3.38, yaw: -0.4, fov: 28, blockers: BLOCK });
+  S.oManLow  = hero(C.man, { dist: 4.29, height: 1.05, yaw: 0.3, fov: 33 });
+  // the tablet: a tight shot of what she is showing him
+  S.oTablet  = { derive: function (t, v, look) {
+                   C.asst.armR.hand.getWorldPosition(look);
+                   v.set(look.x + 0.55, look.y + 0.42, look.z + 0.75);
+                 }, fov: 30, drift: [0.14, 0.07, 0.05] };
+  // the office is too big for him - the frame says so
+  S.oIsolate = wideOn(C.man, { yaw: 0.25, dist: 12.35, height: 2.9, fov: 44 });
+  S.oTwo     = two(C.man, C.asst, { yaw: 0.3, dist: 2.99, fov: 34 });
+
+  // ---- 4: the hospital ----
+  S.hRush    = wideOn(C.man, { yaw: 2.9, dist: 5.98, height: 1.9, fov: 38 });
+  S.hDocCU   = cu(C.doc, { dist: 3.25, yaw: 0.0, fov: 28, blockers: BLOCK });
+  S.hManCU   = cu(C.man, { dist: 2.99, yaw: 0.25, fov: 26, blockers: BLOCK });
+  S.hTwo     = two(C.man, C.wife, { yaw: 0.4, dist: 2.86, fov: 34 });
+  S.hWide    = wideOn(C.man, { yaw: 2.6, dist: 9.75, height: 2.6, fov: 42 });
+
+  // ---- 5: the luxury house ----
+  S.rMan     = cu(C.man, { dist: 3.77, yaw: 0.5, rise: 0.12, fov: 30, blockers: BLOCK });
+  S.rManCU   = cu(C.man, { dist: 2.86, yaw: 0.4, rise: 0.15, fov: 26, blockers: BLOCK });
+  S.rWife    = cu(C.wife, { dist: 3.51, yaw: -0.45, fov: 28, blockers: BLOCK });
+  S.rTwo     = two(C.man, C.wife, { yaw: -0.4, dist: 3.38, rise: 0.45, fov: 35 });
+  S.rWide    = wideOn(C.man, { yaw: -0.6, dist: 9.10, height: 2.4, fov: 42 });
+
+  // ---- 6-11: the apartment ----
+  S.aDoor    = wideOn(C.friend, { yaw: 0.9, dist: 4.42, height: 1.95, fov: 36 });
+  S.aManCU   = cu(C.man, { dist: 2.99, yaw: 0.42, rise: 0.10, fov: 27, blockers: BLOCK });
+  S.aFriendCU= cu(C.friend, { dist: 2.99, yaw: -0.42, rise: 0.10, fov: 27, blockers: BLOCK });
+  S.aTwo     = two(C.man, C.friend, { yaw: 0.45, dist: 2.86, rise: 0.5, fov: 34 });
+  S.aOver    = over(C.friend, C.man, { back: 1.9, side: 0.7, rise: 0.35, fov: 35 });
+  S.aWide    = wideOn(C.man, { yaw: 0.7, dist: 6.76, height: 2.2, fov: 40 });
+  // he looks at the photograph: frame him with it in shot
+  S.aPhoto   = { derive: function (t, v, look) {
+                   headOf(C.man, look);
+                   look.y -= 0.1;
+                   v.set(look.x + 2.0, look.y + 0.45, look.z + 1.5);
+                 }, fov: 30, drift: [0.16, 0.08, 0.06] };
+  // at the window, the city carrying on behind him
+  S.aWindow  = { derive: function (t, v, look) {
+                   headOf(C.man, look);
+                   look.y -= 0.15;
+                   v.set(look.x + 1.5, look.y + 0.3, look.z + 2.4);
+                 }, fov: 33, drift: [0.2, 0.09, 0.08] };
+  // the bare wrist where the watch used to be
+  S.aWrist   = { derive: function (t, v, look) {
+                   C.man.armL.hand.getWorldPosition(look);
+                   v.set(look.x + 0.62, look.y + 0.3, look.z + 0.6);
+                 }, fov: 27, drift: [0.12, 0.06, 0.05] };
+
+  // ---- 12: the street ----
+  S.sWalk    = wideOn(C.man, { yaw: 0.6, dist: 6.50, height: 1.8, fov: 38 });
+  S.sPullUp  = { pos: [3.0, 2.2, 7.0], look: [-4, 1.3, -4], fov: 42,
+                 drift: [0.4, 0.18, 0.2],
+                 path: [[3.0, 2.2, 7.0], [2.0, 11.0, 18.0], [0.0, 30.0, 40.0]] };
+
+  for (var k in S) SHOTS[k] = S[k];
+  return SHOTS;
+}
+
+function smoothstep(x) {
+  x = x < 0 ? 0 : (x > 1 ? 1 : x);
+  return x * x * (3 - 2 * x);
+}
+
+function bez3(p, u, out) {
+  var v = 1 - u;
+  out.set(
+    v * v * p[0][0] + 2 * v * u * p[1][0] + u * u * p[2][0],
+    v * v * p[0][1] + 2 * v * u * p[1][1] + u * u * p[2][1],
+    v * v * p[0][2] + 2 * v * u * p[1][2] + u * u * p[2][2]
+  );
+  return out;
+}
+
+// Mid-line camera changes, each tagged with its scene so it cannot survive
+// the cut into the next one.
+var SUBCUTS = [
+  { t: 10.20, sc: 2,  cam: "oTablet"  },
+  { t: 22.60, sc: 2,  cam: "oManLow"  },
+  { t: 29.90, sc: 2,  cam: "oIsolate" },
+  { t: 33.80, sc: 3,  cam: "oManCU"   },
+  { t: 50.40, sc: 4,  cam: "hManCU"   },
+  { t: 51.90, sc: 4,  cam: "hTwo"     },
+  { t: 58.60, sc: 5,  cam: "rWide"    },
+  { t: 62.10, sc: 5,  cam: "rMan"     },
+  { t: 73.20, sc: 5,  cam: "rTwo"     },
+  { t: 99.80, sc: 7,  cam: "aOver"    },
+  { t: 107.0, sc: 7,  cam: "aManCU"   },
+  { t: 116.0, sc: 8,  cam: "aWide"    },
+  { t: 128.5, sc: 8,  cam: "aPhoto"   },
+  { t: 151.0, sc: 9,  cam: "aWindow"  },
+  { t: 163.5, sc: 9,  cam: "aManCU"   },
+  { t: 176.5, sc: 10, cam: "aTwo"     },
+  { t: 182.0, sc: 10, cam: "aFriendCU"},
+  { t: 206.5, sc: 11, cam: "aWrist"   },
+  { t: 219.0, sc: 12, cam: "sWalk"    }
+];
+
+
+// ===== animations/beats.js =====================================
+// animations/beats.js - the shot list. t/d are MEASURED speech onsets
+// written from aligned.json by retime.py; everything else is direction.
+var BEATS = [
+  { t:0.00, d:1.85, sc:1, who:"asst", cam:"oAerial", mood:"empire", act:"s1_enter" },
+  { t:1.85, d:4.69, sc:1, who:"man", cam:"oManCU", mood:"empire", act:"s1_reply" },
+  { t:6.54, d:6.84, sc:2, who:"asst", cam:"oAsstCU", mood:"cooling", act:"s2_news" },
+  { t:13.38, d:3.74, sc:2, who:"man", cam:"oManCU", mood:"cooling", act:"s2_disbelief" },
+  { t:17.12, d:2.72, sc:2, who:"asst", cam:"oTablet", mood:"cooling", act:"s2_bankrupt" },
+  { t:19.84, d:4.90, sc:2, who:"man", cam:"oManLow", mood:"cold", act:"s2_anger" },
+  { t:24.74, d:3.46, sc:2, who:"asst", cam:"oAsstCU", mood:"cold", act:"s2_sorry" },
+  { t:28.20, d:3.28, sc:2, who:"man", cam:"oIsolate", mood:"cold", act:"s2_sink" },
+  { t:31.48, d:4.08, sc:3, who:"wife", cam:"oManCU", mood:"cold", act:"s3_call" },
+  { t:35.56, d:2.18, sc:3, who:"man", cam:"oManCU", mood:"transit", act:"s3_what" },
+  { t:37.74, d:3.04, sc:3, who:"wife", cam:"oManCU", mood:"transit", act:"s3_son" },
+  { t:40.77, d:4.28, sc:4, who:"man", cam:"hRush", mood:"clinical", act:"s4_arrive" },
+  { t:45.05, d:3.58, sc:4, who:"doc", cam:"hDocCU", mood:"clinical", act:"s4_news" },
+  { t:48.64, d:4.60, sc:4, who:"man", cam:"hManCU", mood:"grief", act:"s4_collapse" },
+  { t:53.24, d:10.89, sc:5, who:"man", cam:"rMan", mood:"nightHome", act:"s5_why" },
+  { t:64.13, d:5.63, sc:5, who:"wife", cam:"rWife", mood:"nightHome", act:"s5_bitter" },
+  { t:69.76, d:6.68, sc:5, who:"man", cam:"rMan", mood:"nightCold", act:"s5_curse" },
+  { t:76.44, d:6.39, sc:5, who:"wife", cam:"rTwo", mood:"nightCold", act:"s5_whatelse" },
+  { t:82.82, d:1.81, sc:5, who:"man", cam:"rManCU", mood:"nightCold", act:"s5_dontknow" },
+  { t:84.63, d:3.42, sc:7, who:"friend", cam:"aDoor", mood:"aptDusk", act:"s7_arrive" },
+  { t:88.05, d:1.39, sc:7, who:"man", cam:"aManCU", mood:"aptDusk", act:"s7_thanks" },
+  { t:89.44, d:4.98, sc:7, who:"friend", cam:"aFriendCU", mood:"aptDusk", act:"s7_ask" },
+  { t:94.42, d:2.12, sc:7, who:"man", cam:"aManCU", mood:"aptDusk", act:"s7_mean" },
+  { t:96.54, d:7.70, sc:7, who:"friend", cam:"aFriendCU", mood:"aptHard", act:"s7_accuse" },
+  { t:104.24, d:4.15, sc:7, who:"man", cam:"aManCU", mood:"aptHard", act:"s7_thousand" },
+  { t:108.39, d:2.73, sc:7, who:"friend", cam:"aFriendCU", mood:"aptHard", act:"s7_figure" },
+  { t:111.12, d:9.73, sc:8, who:"man", cam:"aManCU", mood:"aptQuiet", act:"s8_believed" },
+  { t:120.85, d:2.75, sc:8, who:"friend", cam:"aFriendCU", mood:"aptQuiet", act:"s8_still" },
+  { t:123.60, d:9.81, sc:8, who:"man", cam:"aPhoto", mood:"aptQuiet", act:"s8_broken" },
+  { t:133.41, d:2.18, sc:9, who:"friend", cam:"aFriendCU", mood:"aptQuiet", act:"s9_why" },
+  { t:135.59, d:3.58, sc:9, who:"man", cam:"aManCU", mood:"aptWarm", act:"s9_never" },
+  { t:139.18, d:2.65, sc:9, who:"friend", cam:"aFriendCU", mood:"aptWarm", act:"s9_butlost" },
+  { t:141.83, d:3.94, sc:9, who:"man", cam:"aManCU", mood:"aptWarm", act:"s9_know" },
+  { t:145.77, d:1.43, sc:9, who:"friend", cam:"aFriendCU", mood:"aptWarm", act:"s9_whatsleft" },
+  { t:147.20, d:9.46, sc:9, who:"man", cam:"aWindow", mood:"aptWarm", act:"s9_remains" },
+  { t:156.66, d:3.29, sc:9, who:"friend", cam:"aFriendCU", mood:"aptWarm", act:"s9_startover" },
+  { t:159.95, d:7.55, sc:9, who:"man", cam:"aManCU", mood:"aptWarm", act:"s9_never_again" },
+  { t:167.50, d:3.53, sc:9, who:"friend", cam:"aFriendCU", mood:"aptWarm", act:"s9_whatdo" },
+  { t:171.03, d:14.88, sc:10, who:"man", cam:"aTwo", mood:"aptHope", act:"s10_tomorrow" },
+  { t:185.91, d:2.48, sc:10, who:"friend", cam:"aFriendCU", mood:"aptHope", act:"s10_couldnt" },
+  { t:188.39, d:3.31, sc:10, who:"man", cam:"aManCU", mood:"aptHope", act:"s10_nochoice" },
+  { t:191.70, d:4.67, sc:11, who:"friend", cam:"aFriendCU", mood:"aptHope", act:"s11_blessed" },
+  { t:196.36, d:4.51, sc:11, who:"man", cam:"aManCU", mood:"aptHope", act:"s11_confusing" },
+  { t:200.88, d:2.01, sc:11, who:"friend", cam:"aFriendCU", mood:"aptHope", act:"s11_mean2" },
+  { t:202.89, d:7.32, sc:11, who:"man", cam:"aWrist", mood:"aptHope", act:"s11_favor" },
+  { t:210.20, d:18.08, sc:12, who:"narr", cam:"sPullUp", mood:"dawn", act:"s12_walk" },
+];
+
+
+// ===== characters/cast.js ======================================
+// characters/cast.js — six speakers plus background life.
+//
+// The man is built ONCE and reused in every scene. His face, proportions and
+// identity never change; what changes is the jacket (removed after the
+// collapse), the tie (gone by the apartment), the watch (taken off on camera
+// in scene 6) and his shirt colour. The brief is explicit that the character
+// must stay the same person throughout, so nothing else is allowed to vary.
+
+function buildCast() {
+  var C = {};
+
+  C.man = buildPerson({
+    modern: true, skin: PAL.skinA, robe: PAL.shirtWhite,
+    trousers: PAL.suitCharcoal, jacket: PAL.suitNavy, tie: PAL.tieA,
+    watch: PAL.watch, hair: PAL.hairSalt, beard: false,
+    height: 1.03, build: 1.02, eye: 0x3a3028
+  });
+
+  C.asst = buildPerson({
+    modern: true, skin: PAL.skinD, robe: PAL.blouse,
+    trousers: PAL.skirtDark, jacket: PAL.skirtDark,
+    hair: PAL.hairBlonde, height: 0.96, build: 0.95, eye: 0x3a4a3a
+  });
+
+  C.wife = buildPerson({
+    modern: true, skin: PAL.skinD, robe: PAL.blouse,
+    trousers: PAL.skirtDark, hair: PAL.hairWife,
+    height: 0.96, build: 0.96, eye: 0x4a3828
+  });
+
+  C.doc = buildPerson({
+    modern: true, skin: PAL.skinB, robe: PAL.scrubs,
+    trousers: PAL.scrubs, jacket: PAL.coat,
+    hair: PAL.hairDark, height: 1.0, build: 1.0, eye: 0x332a22
+  });
+
+  C.friend = buildPerson({
+    modern: true, skin: PAL.skinC, robe: PAL.friendShirt,
+    trousers: PAL.jeans, jacket: PAL.friendJacket,
+    hair: PAL.hairDark, beard: true, height: 1.01, build: 1.06, eye: 0x2e2620
+  });
+
+  // background life: hospital staff, pedestrians. Never the focus, but the
+  // brief asks for a world that keeps running, so they exist.
+  C.extras = [];
+  var ecfg = [
+    { skin: PAL.skinB, shirt: PAL.scrubs, tr: PAL.scrubs, hair: PAL.hairDark, h: 0.97 },
+    { skin: PAL.skinD, shirt: PAL.coat, tr: PAL.scrubs, hair: PAL.hairBlonde, h: 0.95 },
+    { skin: PAL.skinC, shirt: PAL.plainShirt, tr: PAL.jeans, hair: PAL.hairMid, h: 1.0 },
+    { skin: PAL.skinA, shirt: PAL.plainShirtAlt, tr: PAL.suitCharcoal, hair: PAL.hairGrey, h: 0.99 },
+    { skin: PAL.skinD, shirt: PAL.blouse, tr: PAL.skirtDark, hair: PAL.hairWife, h: 0.94 },
+    { skin: PAL.skinB, shirt: PAL.friendShirt, tr: PAL.jeans, hair: PAL.hairDark, h: 1.02 },
+    { skin: PAL.skinA, shirt: PAL.plainShirt, tr: PAL.jeans, hair: PAL.hairSalt, h: 0.98 },
+    { skin: PAL.skinC, shirt: PAL.shirtWhite, tr: PAL.suitNavy, hair: PAL.hairDark, h: 1.01 }
+  ];
+  for (var i = 0; i < ecfg.length; i++) {
+    var e = ecfg[i];
+    C.extras.push(buildPerson({
+      modern: true, skin: e.skin, robe: e.shirt, trousers: e.tr,
+      hair: e.hair, height: e.h, build: 0.95 + (i % 4) * 0.04
+    }));
+  }
+
+  return C;
+}
+
+function castList(C) {
+  return [C.man, C.asst, C.wife, C.doc, C.friend].concat(C.extras);
+}
+
+function hideAll(C) {
+  var l = castList(C);
+  for (var i = 0; i < l.length; i++) l[i].root.visible = false;
+}
+
+function place(c, x, z, ry, y) {
+  c.root.visible = true;
+  c.root.position.set(x, y === undefined ? 0 : y, z);
+  c.root.rotation.y = ry === undefined ? 0 : ry;
+}
+
+function clearPose(c) {
+  var s = c.s;
+  s.lean = 0; s.slump = 0; s.headDown = 0; s.headTurn = 0; s.headTilt = 0;
+  s.browAngle = 0; s.browRaise = 0; s.lidDrop = 0;
+  s.armUpL = 0; s.armUpR = 0; s.reach = 0; s.point = 0; s.shield = 0;
+  s.kneel = 0; s.fallen = 0; s.walk = 0;
+}
+
+// The man's decline, applied as a single function so it can never get out of
+// step with itself. 0 = the opening, 1 = the apartment.
+function setDecline(C, level) {
+  var m = C.man;
+  if (m.jacket) m.jacket.visible = level < 0.5;
+  m.robe.material.color.setHex(level < 0.5 ? PAL.suitCharcoal : PAL.jeans);
+  // posture floor: he never fully straightens again until scene 10
+  m.s.slump = Math.max(m.s.slump, level * 0.35);
+}
+
+function setWatch(C, on) {
+  if (C.man.watch) C.man.watch.visible = !!on;
+}
+
+// --------------------------------------------------------------- staging
+
+function stageScene(n, C, SETS) {
+  hideAll(C);
+  for (var k in SETS) if (SETS[k]) SETS[k].visible = false;
+  var l = castList(C);
+  for (var i = 0; i < l.length; i++) clearPose(l[i]);
+
+  // 1-2: the executive office
+  if (n === 1 || n === 2) {
+    SETS.office.visible = true;
+    setDecline(C, 0);
+    setWatch(C, true);
+    // cu() stands in FRONT of a face, i.e. along the subject's own facing,
+    // so whatever a character faces ends up BEHIND the camera and whatever
+    // is at their back becomes the backdrop. The office's furniture sits at
+    // z=-2.4 (desk) to -6.9 (screen, shelves) and the glass wall at +5.2, so
+    // the pair stand deep in the room with their backs to the furniture,
+    // facing +z. Their close-ups then frame desk and shelves behind them.
+    // Staged the other way round - which the first two passes did - every
+    // face shot backs onto empty sky.
+    place(C.man, 0.5, -3.3, 0.10);
+    place(C.asst, -1.5, -4.4, 0.32);
+    return;
+  }
+
+  // 3: the call - still the office, he is alone
+  if (n === 3) {
+    SETS.office.visible = true;
+    setDecline(C, 0);
+    setWatch(C, true);
+    place(C.man, 0.45, -3.1, 0.08);
+    return;
+  }
+
+  // 4: the hospital corridor
+  if (n === 4) {
+    SETS.hospital.visible = true;
+    setDecline(C, 0.2);
+    setWatch(C, true);
+    place(C.man, 0.1, -3.2, Math.PI);          // facing down the corridor
+    place(C.doc, -0.2, -7.4, 0);
+    place(C.wife, 2.6, -2.0, -0.7);
+    // staff at a distance, deliberately not the subject
+    place(C.extras[0], -3.2, -9.5, 0.4);
+    place(C.extras[1], 2.9, -10.2, -0.3);
+    C.extras[0].s.walk = 0.4;
+    C.extras[1].s.walk = 0.3;
+    return;
+  }
+
+  // 5: the luxury house at night
+  if (n === 5) {
+    SETS.residence.visible = true;
+    setDecline(C, 0.45);
+    setWatch(C, true);
+    place(C.man, -0.6, 0.55, 0.12);            // seated on the couch
+    C.man.root.position.y = 0.30;
+    C.man.s.kneel = 0.95;                      // reads as sitting
+    C.man.s.slump = 0.7;
+    C.man.s.headDown = 0.55;
+    place(C.wife, 1.9, 2.2, Math.PI - 0.9);
+    return;
+  }
+
+  // 6-11: the modest apartment
+  if (n >= 6 && n <= 11) {
+    SETS.apartment.visible = true;
+    setDecline(C, 1);
+    setWatch(C, n >= 7 ? false : true);        // the watch comes off in 6
+    place(C.man, -1.1, -1.25, 0.30);
+    C.man.root.position.y = 0.26;
+    C.man.s.kneel = 0.95;
+    C.man.s.slump = n <= 8 ? 0.55 : 0.3;
+    if (n >= 7) {
+      place(C.friend, 1.85, -0.5, -0.85);
+      C.friend.root.position.y = 0.26;
+      C.friend.s.kneel = 0.95;
+    }
+    if (n >= 10) {
+      place(C.wife, -0.2, -1.5, 0.25);
+      C.wife.root.position.y = 0.26;
+      C.wife.s.kneel = 0.95;
+    }
+    return;
+  }
+
+  // 12: the street at sunrise
+  if (n === 12) {
+    SETS.street.visible = true;
+    setDecline(C, 1);
+    setWatch(C, false);
+    place(C.man, -5.0, 2.0, Math.PI);
+    C.man.s.walk = 1;
+    C.man.s.slump = 0.12;
+    // the city keeps running
+    var ped = [[-6.2, -7, 0], [-4.4, -14, Math.PI], [5.6, -5, Math.PI],
+               [6.4, -12, 0], [-5.8, -20, Math.PI], [5.2, -18, 0]];
+    for (var p = 0; p < ped.length && p < C.extras.length; p++) {
+      place(C.extras[p], ped[p][0], ped[p][1], ped[p][2]);
+      C.extras[p].s.walk = 0.75 + (p % 3) * 0.12;
+    }
+    return;
+  }
+}
+
+
+// ===== animations/acts.js ======================================
+// animations/acts.js — one function per beat.
+//
+// Acts set targets only; perform.js eases toward them, so a cut never lands
+// on a snapped pose. Listeners are posed too: a scene where only the speaker
+// moves reads as two machines taking turns, and most of this film is two
+// people in a room talking.
+
+function buildActs(film) {
+  function face(c, other) {
+    if (!c || !other) return;
+    var dx = other.root.position.x - c.root.position.x;
+    var dz = other.root.position.z - c.root.position.z;
+    var want = Math.atan2(dx, dz) - c.root.rotation.y;
+    while (want > Math.PI) want -= Math.PI * 2;
+    while (want < -Math.PI) want += Math.PI * 2;
+    c.s.headTurn = Math.max(-1, Math.min(1, want / 0.5));
+  }
+
+  var A = {};
+
+  // ---------------------------------------------------- 1: the empire
+  A.s1_enter = function (C) {
+    C.man.s.lean = 0.1;
+    C.man.s.browRaise = 0.15;
+    C.asst.s.walk = 0.45;
+    C.asst.s.browRaise = 0.5;       // already worried
+    face(C.asst, C.man);
+  };
+  A.s1_reply = function (C) {
+    C.asst.s.walk = 0;
+    C.man.s.headTurn = 0;
+    C.man.s.browRaise = 0.25;
+    C.man.s.armUpR = 0.2;           // mid-gesture, a busy man
+    face(C.man, C.asst);
+  };
+
+  // ------------------------------------------------- 2: the collapse
+  A.s2_news = function (C) {
+    C.asst.s.reach = 0.55;          // holding the tablet out
+    C.asst.s.browRaise = 0.7;
+    C.asst.s.lean = 0.15;
+    C.man.s.browRaise = 0.5;
+    face(C.man, C.asst);
+  };
+  A.s2_disbelief = function (C) {
+    C.man.s.browRaise = 1;
+    C.man.s.lean = 0.3;
+    C.man.s.armUpR = 0.5;
+    C.asst.s.reach = 0.35;
+    C.asst.s.headDown = 0.2;
+  };
+  A.s2_bankrupt = function (C) {
+    C.asst.s.reach = 0.7;
+    C.asst.s.headDown = 0.3;
+    C.asst.s.browRaise = 0.6;
+    C.man.s.browRaise = 0.8;
+    C.man.s.lean = 0.2;
+  };
+  A.s2_anger = function (C) {
+    C.man.s.browAngle = 1;          // inner brows down: anger, not fear
+    C.man.s.point = 0.8;
+    C.man.s.lean = 0.35;
+    C.man.s.armUpR = 0.6;
+    C.asst.s.slump = 0.3;
+    C.asst.s.headDown = 0.4;
+    C.asst.s.reach = 0;
+  };
+  A.s2_sorry = function (C) {
+    C.asst.s.headDown = 0.5;
+    C.asst.s.slump = 0.4;
+    C.asst.s.browRaise = 0.4;
+    C.man.s.point = 0.2;
+    C.man.s.browAngle = 0.6;
+  };
+  A.s2_sink = function (C) {
+    var s = C.man.s;
+    s.point = 0; s.browAngle = 0; s.browRaise = 0.3;
+    s.slump = 0.6; s.headDown = 0.45; s.armUpR = 0; s.lean = 0;
+    C.asst.s.headDown = 0.35;
+  };
+
+  // ----------------------------------------------- 3: the phone call
+  A.s3_call = function (C) {
+    var s = C.man.s;
+    s.armUpR = 1.15;                // phone to the ear
+    s.headTilt = 0.2;
+    s.slump = 0.4;
+    s.browRaise = 0.4;
+  };
+  A.s3_what = function (C) {
+    var s = C.man.s;
+    s.armUpR = 1.15; s.browRaise = 0.9; s.lean = 0.2; s.headTilt = 0.25;
+  };
+  A.s3_son = function (C) {
+    var s = C.man.s;
+    s.armUpR = 1.1; s.browRaise = 1; s.slump = 0.55; s.headDown = 0.3;
+  };
+
+  // ------------------------------------------------- 4: the hospital
+  A.s4_arrive = function (C) {
+    var s = C.man.s;
+    s.armUpR = 0; s.walk = 0.9; s.lean = 0.25; s.browRaise = 0.9;
+    C.wife.s.slump = 0.7;
+    C.wife.s.headDown = 0.6;
+    C.doc.s.walk = 0.35;
+  };
+  A.s4_news = function (C) {
+    C.man.s.walk = 0;
+    C.man.s.browRaise = 1;
+    C.doc.s.walk = 0;
+    C.doc.s.headDown = 0.35;
+    C.doc.s.slump = 0.2;
+    C.doc.s.browRaise = 0.3;
+    face(C.doc, C.man);
+    face(C.man, C.doc);
+  };
+  A.s4_collapse = function (C) {
+    var s = C.man.s;
+    s.headTurn = 0; s.browRaise = 1; s.slump = 1; s.headDown = 0.8;
+    s.kneel = 0.9;                  // down onto his knees
+    s.armUpL = 0.3; s.armUpR = 0.3;
+    C.wife.s.reach = 0.6;
+    C.wife.s.lean = 0.3;
+    C.wife.s.slump = 0.6;
+    C.doc.s.headDown = 0.45;
+  };
+
+  // -------------------------------------------- 5: the empty house
+  A.s5_why = function (C) {
+    var s = C.man.s;
+    s.kneel = 0.95; s.slump = 0.7; s.headDown = 0.4; s.browRaise = 0.4;
+    s.armUpL = 0.15; s.armUpR = 0.15;
+    C.wife.s.headTurn = 0.2;
+    C.wife.s.slump = 0.3;
+  };
+  A.s5_bitter = function (C) {
+    C.wife.s.lean = 0.2;
+    C.wife.s.browAngle = 0.4;       // exhausted and angry, not cruel
+    C.wife.s.browRaise = 0.3;
+    C.wife.s.point = 0.3;
+    face(C.wife, C.man);
+    C.man.s.headDown = 0.55;
+  };
+  A.s5_curse = function (C) {
+    var s = C.man.s;
+    s.headDown = 0.1; s.browRaise = 0.7; s.lean = 0.2; s.armUpR = 0.4;
+    C.wife.s.point = 0;
+    C.wife.s.slump = 0.35;
+  };
+  A.s5_whatelse = function (C) {
+    C.wife.s.browRaise = 0.5;
+    C.wife.s.slump = 0.5;
+    C.wife.s.headDown = 0.2;
+    C.man.s.armUpR = 0;
+    C.man.s.headDown = 0.4;
+  };
+  A.s5_dontknow = function (C) {
+    var s = C.man.s;
+    s.slump = 0.85; s.headDown = 0.7; s.browRaise = 0.2; s.lean = 0;
+  };
+
+  // ------------------------------------------ 7: the judgmental friend
+  A.s7_arrive = function (C) {
+    C.friend.s.kneel = 0.9;
+    C.friend.s.lean = 0.15;
+    C.friend.s.browRaise = 0.4;
+    face(C.friend, C.man);
+    C.man.s.headDown = 0.3;
+    C.man.s.slump = 0.55;
+  };
+  A.s7_thanks = function (C) {
+    C.man.s.headTurn = 0.3;
+    C.man.s.headDown = 0.2;
+    C.man.s.browRaise = 0.2;
+    face(C.man, C.friend);
+  };
+  A.s7_ask = function (C) {
+    C.friend.s.lean = 0.25;
+    C.friend.s.browRaise = 0.5;
+    C.friend.s.armUpR = 0.25;
+    C.man.s.headTurn = 0.35;
+  };
+  A.s7_mean = function (C) {
+    C.man.s.browRaise = 0.6;
+    C.man.s.lean = 0.1;
+    C.friend.s.armUpR = 0.1;
+  };
+  A.s7_accuse = function (C) {
+    // the face hardens while the voice stays friendly
+    C.friend.s.browAngle = 0.55;
+    C.friend.s.point = 0.5;
+    C.friend.s.lean = 0.3;
+    C.man.s.slump = 0.5;
+    C.man.s.headDown = 0.35;
+    C.man.s.browRaise = 0.3;
+  };
+  A.s7_thousand = function (C) {
+    C.man.s.headDown = 0.1;
+    C.man.s.browAngle = 0.3;
+    C.man.s.lean = 0.2;
+    C.friend.s.point = 0.1;
+    C.friend.s.browAngle = 0.3;
+  };
+  A.s7_figure = function (C) {
+    C.friend.s.point = 0.4;
+    C.friend.s.browAngle = 0.4;
+    C.man.s.lean = 0;
+    C.man.s.headDown = 0.4;
+    C.man.s.slump = 0.6;
+  };
+
+  // --------------------------------------- 8: the crisis of faith
+  A.s8_believed = function (C) {
+    var s = C.man.s;
+    s.headDown = 0.3; s.slump = 0.5; s.browRaise = 0.3; s.browAngle = 0.15;
+    C.friend.s.point = 0;
+    C.friend.s.browAngle = 0.1;
+    C.friend.s.lean = 0.1;
+  };
+  A.s8_still = function (C) {
+    C.friend.s.browRaise = 0.5;
+    C.friend.s.lean = 0.15;
+    C.man.s.headTurn = 0.25;
+  };
+  A.s8_broken = function (C) {
+    var s = C.man.s;
+    s.headTurn = -0.4;              // toward the photograph
+    s.headDown = 0.2; s.browRaise = 0.4; s.slump = 0.45;
+    C.friend.s.headDown = 0.15;
+    C.friend.s.browAngle = 0;
+  };
+
+  // ------------------------------------------- 9: what remains
+  A.s9_why = function (C) {
+    C.friend.s.browRaise = 0.45;
+    C.friend.s.lean = 0.2;
+    C.man.s.headTurn = 0.2;
+  };
+  A.s9_never = function (C) {
+    C.man.s.headDown = 0.1;
+    C.man.s.slump = 0.35;
+    C.man.s.browRaise = 0.3;
+  };
+  A.s9_butlost = function (C) {
+    C.friend.s.browRaise = 0.4;
+    C.friend.s.armUpR = 0.3;
+    C.man.s.headDown = 0.25;
+  };
+  A.s9_know = function (C) {
+    C.man.s.headDown = 0.3;
+    C.man.s.browRaise = 0.25;
+    C.friend.s.armUpR = 0;
+  };
+  A.s9_whatsleft = function (C) {
+    C.friend.s.lean = 0.25;
+    C.friend.s.browRaise = 0.5;
+  };
+  A.s9_remains = function (C) {
+    // he stands and goes to the window
+    var s = C.man.s;
+    s.kneel = 0; s.slump = 0.25; s.headDown = 0; s.browRaise = 0.35;
+    C.man.root.position.y = 0;
+    C.friend.s.headTurn = -0.3;
+  };
+  A.s9_startover = function (C) {
+    C.friend.s.browRaise = 0.45;
+    C.man.s.headTurn = 0.3;
+  };
+  A.s9_never_again = function (C) {
+    C.man.s.headDown = 0.2;
+    C.man.s.slump = 0.3;
+    C.man.s.browRaise = 0.2;
+  };
+  A.s9_whatdo = function (C) {
+    C.friend.s.browRaise = 0.5;
+    C.friend.s.lean = 0.2;
+  };
+
+  // -------------------------------- 10: the decision to continue
+  A.s10_tomorrow = function (C) {
+    // back on the couch, beside his wife, and upright for the first time
+    var s = C.man.s;
+    s.kneel = 0.95; s.slump = 0.1; s.headDown = 0; s.browRaise = 0.3;
+    s.lean = 0.1;
+    C.man.root.position.y = 0.26;
+    if (C.wife.root.visible) {
+      C.wife.s.kneel = 0.95;
+      C.wife.s.headTurn = 0.25;
+      C.wife.s.slump = 0.2;
+    }
+    C.friend.s.browRaise = 0.3;
+    C.friend.s.lean = 0.1;
+  };
+  A.s10_couldnt = function (C) {
+    C.friend.s.headDown = 0.2;
+    C.friend.s.browRaise = 0.4;
+    C.man.s.headTurn = 0.2;
+  };
+  A.s10_nochoice = function (C) {
+    C.man.s.slump = 0.12;
+    C.man.s.browRaise = 0.25;
+    C.man.s.armUpL = 0.2;           // takes her hand
+    if (C.wife.root.visible) C.wife.s.armUpR = 0.2;
+  };
+
+  // ------------------------------ 11: the meaning of blessings
+  A.s11_blessed = function (C) {
+    C.friend.s.browRaise = 0.35;
+    C.friend.s.lean = 0.15;
+    C.man.s.headTurn = 0.2;
+  };
+  A.s11_confusing = function (C) {
+    C.man.s.browRaise = 0.3;
+    C.man.s.slump = 0.12;
+    C.man.s.headDown = 0.05;
+  };
+  A.s11_mean2 = function (C) {
+    C.friend.s.browRaise = 0.45;
+    C.friend.s.headDown = 0.1;
+  };
+  A.s11_favor = function (C) {
+    // he looks at the bare wrist
+    C.man.s.armUpL = 0.5;
+    C.man.s.headDown = 0.3;
+    C.man.s.browRaise = 0.2;
+    C.friend.s.headDown = 0.3;      // the friend lowers his eyes
+    C.friend.s.browRaise = 0.1;
+  };
+
+  // ----------------------------------- 12: a new beginning
+  A.s12_walk = function (C) {
+    var s = C.man.s;
+    s.walk = 1; s.kneel = 0; s.slump = 0.12; s.headDown = 0;
+    s.browRaise = 0.2; s.armUpL = 0; s.armUpR = 0; s.lean = 0.05;
+    C.man.root.position.y = 0;
+  };
+
+  return A;
+}
+
+
+// ===== scripts/transport.js ====================================
+// scripts/transport.js — the clock, the beat dispatcher, and the frame loop.
+//
+// In playback the <audio> element IS the clock: every frame reads
+// voice.currentTime, so picture cannot drift from sound no matter how the
+// browser schedules frames. In render mode time is supplied in exact 1/30s
+// steps instead, which makes the render deterministic and resumable.
+//
+// Beats are dispatched by onset, not by accumulation. Because each beat's `t`
+// came from a measured speech onset, a cut can never land before its line is
+// spoken.
+
+var FPS = 30;
+
+function makeTransport(opts) {
+  var beats = opts.beats;
+  var duration = opts.duration;
+  var applyBeat = opts.applyBeat;
+  var frame = opts.frame;
+  var voice = opts.voice;
+  var renderMode = opts.renderMode;
+
+  var time = 0;
+  var playing = false;
+  var beatIdx = -1;
+  var last = 0;
+
+  // Find the beat that owns time t. Linear from the current index in playback
+  // (cheap), binary search on seek (correct after a jump).
+  function beatAt(t) {
+    var lo = 0, hi = beats.length - 1, best = 0;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (beats[mid].t <= t) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    return best;
+  }
+
+  function sync(t) {
+    var want = beatAt(t);
+    if (want !== beatIdx) {
+      // When seeking forward over several beats, apply them in order so any
+      // state they set (a character's pose, which set is visible) ends up
+      // where it would have been had the film played through.
+      var from = want < beatIdx ? 0 : beatIdx + 1;
+      for (var i = from; i <= want; i++) applyBeat(beats[i], i, t);
+      beatIdx = want;
+    }
+  }
+
+  function step(t, dt) {
+    time = t;
+    sync(t);
+    frame(t, dt);
+  }
+
+  // ---- playback ----
+  function loop() {
+    if (!playing) return;
+    var t = voice.currentTime;
+    var dt = Math.min(0.1, Math.max(0.0005, t - last));
+    last = t;
+    step(t, dt);
+    if (t < duration) {
+      requestAnimationFrame(loop);
+    } else {
+      playing = false;
+    }
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    last = voice.currentTime;
+    voice.play();
+    requestAnimationFrame(loop);
+  }
+
+  function reset() {
+    time = 0;
+    beatIdx = -1;
+    last = 0;
+    applyBeat(beats[0], 0, 0);
+    beatIdx = 0;
+    step(0, 1 / FPS);
+  }
+
+  // ---- render mode ----
+  // Advance in exact frame steps from wherever we are to the requested time,
+  // so eased values (which integrate dt) land identically on every pass. A
+  // shard that starts at frame 2000 must produce the same pixels as a full
+  // run, so seekTo walks the easing forward rather than teleporting.
+  function seekTo(t) {
+    var steps = Math.round(t * FPS);
+    for (var i = 0; i <= steps; i++) step(i / FPS, 1 / FPS);
+  }
+
+  function advanceTo(t) {
+    var target = Math.round(t * FPS);
+    var cur = Math.round(time * FPS);
+    if (target < cur) { reset(); cur = 0; }
+    for (var f = cur + 1; f <= target; f++) step(f / FPS, 1 / FPS);
+    if (target === 0) step(0, 1 / FPS);
+  }
+
+  // Jump straight to t for inspection: apply every beat up to t, then run
+  // `settle` frames so eased values land near their targets. Cheap, but NOT
+  // frame-exact - renders must use advanceTo.
+  function jumpTo(t, settle) {
+    time = t;
+    beatIdx = -1;
+    sync(t);
+    for (var i = 0; i < (settle || 20); i++) frame(t, 1 / FPS);
+  }
+
+  return {
+    play: play, reset: reset, seekTo: seekTo, advanceTo: advanceTo,
+    jumpTo: jumpTo,
+    step: step, duration: duration,
+    get time() { return time; },
+    get beatIdx() { return beatIdx; }
+  };
+}
+
+
+// ===== scripts/frame.js ========================================
+// scripts/frame.js — one frame of the film.
+//
+// Order matters: actions set pose targets, the performance pass eases bodies
+// toward them, the camera is solved from the current shot, then light and
+// effects are interpolated and drawn. Everything here is a pure function of
+// (t, dt) given the beat state, which is what makes the render deterministic.
+
+function makeFilm(ctx) {
+  var scene = ctx.scene, camera = ctx.camera, renderer = ctx.renderer;
+  var C = ctx.cast, SETS = ctx.sets, L = ctx.lights;
+
+  var curScene = 0;
+  var curShot = SHOTS.oAerial, prevShot = SHOTS.oAerial;
+  var shotT = 1, shotStart = 0, beatStart = 0, beatDur = 1;
+  var mood = {}, targetMood = MOODS.empire;
+  for (var k in MOODS.empire) mood[k] = MOODS.empire[k];
+
+  var speaker = null, speakStart = 0, speakDur = 0;
+  var blind = 0, blindTarget = 0;        // subjective blindness fade
+  var scales = 0;                        // the scales-falling particles
+  var subIdx = -1;
+
+  var vTmp = new THREE.Vector3(), vLook = new THREE.Vector3();
+  // scratch colours, reused every frame so the loop allocates nothing
+  var vDer = new THREE.Vector3(), vDerLook = new THREE.Vector3();
+  var cFog = new THREE.Color(), cSky = new THREE.Color();
+  var cSun = new THREE.Color(), cAmbS = new THREE.Color(), cAmbG = new THREE.Color();
+  var curSun = new THREE.Color(MOODS.empire.sunCol);
+  var curAmbS = new THREE.Color(MOODS.empire.ambSky);
+  var curAmbG = new THREE.Color(MOODS.empire.ambGnd);
+  var curFog = new THREE.Color(MOODS.empire.fogCol);
+
+  // Colour fields are eased in RGB, never as packed hex: lerping 0x3a4258
+  // toward 0xffe6b0 as a NUMBER passes through greens that are in neither
+  // colour. Everything else in a mood is a scalar and eases normally.
+  var COLOR_KEYS = { sunCol: 1, ambSky: 1, ambGnd: 1, fogCol: 1, skyTop: 1 };
+
+  // ----------------------------------------------------------- the beat
+  function applyBeat(b, i, t) {
+    if (b.sc !== curScene) {
+      stageScene(b.sc, C, SETS);
+      curScene = b.sc;
+    }
+    cutTo(SHOTS[b.cam], b.t, b.d, b.cam === "oAerial" ? 0 : 0.5);
+    targetMood = MOODS[b.mood];
+    speaker = C[b.who] || null;
+    speakStart = b.t;
+    speakDur = b.d;
+    beatStart = b.t;
+    beatDur = b.d;
+    // read ctx.acts live: buildActs needs the film object, so the acts are
+    // attached to ctx after makeFilm returns. Snapshotting it here would
+    // capture null and every beat would be a no-op.
+    var acts = ctx.acts;
+    if (acts && acts[b.act]) acts[b.act](C, b, ctx);
+    // reset the subcut cursor so a seek re-arms the right one
+    subIdx = -1;
+    for (var s = 0; s < SUBCUTS.length; s++) if (SUBCUTS[s].t <= t) subIdx = s;
+  }
+
+  function cutTo(shot, at, dur, blend) {
+    if (!shot || shot === curShot) return;
+    prevShot = sampleShot(curShot, at);
+    curShot = shot;
+    shotStart = at;
+    shotT = (blend === undefined ? 0.5 : blend) <= 0 ? 1 : 0;
+    curShot._blend = blend === undefined ? 0.5 : blend;
+    curShot._in = at;
+    curShot._dur = dur;
+  }
+
+  // Resolve a shot to a concrete position/look at time t, including its
+  // Bezier path, its orbit and its drift. Returned as a plain object so a
+  // blend can interpolate from where the previous shot actually was.
+  function sampleShot(shot, t) {
+    var inT = shot._in === undefined ? 0 : shot._in;
+    var dur = shot._dur === undefined ? 4 : shot._dur;
+    var u = dur > 0 ? Math.min(1, Math.max(0, (t - inT) / dur)) : 0;
+    var eu = smoothstep(u);
+
+    var px, py, pz;
+    if (shot.derive) {
+      // A derived shot is solved from live character positions, so it cannot
+      // fall out of agreement with staging the way typed coordinates do.
+      shot.derive(t, vDer, vDerLook, eu);
+      px = vDer.x; py = vDer.y; pz = vDer.z;
+      var d0 = shot.drift || [0.2, 0.1, 0.1];
+      px += Math.sin(t * 0.17 + 1.3) * d0[0] * 0.14;
+      py += Math.sin(t * 0.23 + 2.1) * d0[1] * 0.12;
+      pz += Math.sin(t * 0.13 + 0.7) * d0[2] * 0.14;
+      return { x: px, y: py, z: pz,
+               lx: vDerLook.x, ly: vDerLook.y, lz: vDerLook.z,
+               fov: shot.fov };
+    }
+    if (shot.path) {
+      bez3(shot.path, eu, vTmp);
+      px = vTmp.x; py = vTmp.y; pz = vTmp.z;
+    } else if (shot.orbit) {
+      var o = shot.orbit;
+      var a = o.from + (o.to - o.from) * eu;
+      px = o.c[0] + Math.sin(a) * o.r;
+      py = o.y;
+      pz = o.c[2] + Math.cos(a) * o.r;
+    } else {
+      px = shot.pos[0]; py = shot.pos[1]; pz = shot.pos[2];
+    }
+
+    // drift: a slow wander so nothing is ever locked off
+    var d = shot.drift || [0.3, 0.12, 0.12];
+    px += Math.sin(t * 0.17 + 1.3) * d[0] * 0.14;
+    py += Math.sin(t * 0.23 + 2.1) * d[1] * 0.12;
+    pz += Math.sin(t * 0.13 + 0.7) * d[2] * 0.14;
+
+    var lk = shot.orbit ? shot.orbit.c : shot.look;
+    return { x: px, y: py, z: pz,
+             lx: lk[0], ly: lk[1], lz: lk[2], fov: shot.fov };
+  }
+
+  function solveCamera(t, dt) {
+    // mid-line subcuts
+    for (var s = subIdx + 1; s < SUBCUTS.length; s++) {
+      if (SUBCUTS[s].t > t) break;
+      subIdx = s;
+      // A subcut belongs to its scene. Without this check a late subcut
+      // survives the cut into the next scene and re-aims the camera at an
+      // interior shot while an exterior is on stage - at t=150 the active
+      // camera was hSaulCU, a scene-7 room shot, with scene 8 staged.
+      if (SUBCUTS[s].sc !== undefined && SUBCUTS[s].sc !== curScene) continue;
+      cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
+    }
+
+    var now = sampleShot(curShot, t);
+    if (shotT < 1) {
+      shotT = Math.min(1, shotT + dt / Math.max(0.0001, curShot._blend));
+      var e = smoothstep(shotT);
+      camera.position.set(
+        prevShot.x + (now.x - prevShot.x) * e,
+        prevShot.y + (now.y - prevShot.y) * e,
+        prevShot.z + (now.z - prevShot.z) * e);
+      vLook.set(
+        prevShot.lx + (now.lx - prevShot.lx) * e,
+        prevShot.ly + (now.ly - prevShot.ly) * e,
+        prevShot.lz + (now.lz - prevShot.lz) * e);
+      camera.fov = prevShot.fov + (now.fov - prevShot.fov) * e;
+    } else {
+      camera.position.set(now.x, now.y, now.z);
+      vLook.set(now.lx, now.ly, now.lz);
+      camera.fov = now.fov;
+    }
+    camera.lookAt(vLook);
+    window.__lastLook = vLook;
+    camera.updateProjectionMatrix();
+  }
+
+  // ---------------------------------------------------------- the frame
+  function frame(t, dt) {
+    // ---- performances ----
+    var all = castList(C);
+    for (var i = 0; i < all.length; i++) {
+      var c = all[i];
+      if (!c.root.visible) continue;
+      // the speaker's jaw rides its own line's envelope; everyone else is shut
+      var isSp = (c === speaker);
+      c.s.talking = isSp ? 1 : 0;
+      c.s.jawOpen = isSp ? jawEnvelope(t, speakStart, speakDur, i * 1.7) : 0;
+      animatePerson(c, t, dt);
+    }
+
+    // Walking characters actually travel, along their own facing. Driven
+    // off the pose state rather than named characters, so a cast change
+    // cannot leave a dangling reference here.
+    for (var w = 0; w < all.length; w++) {
+      var wc = all[w];
+      if (!wc.root.visible || wc.s.walk <= 0.01) continue;
+      var spd = dt * 1.15 * wc.s.walk;
+      wc.root.position.x += Math.sin(wc.root.rotation.y) * spd;
+      wc.root.position.z += Math.cos(wc.root.rotation.y) * spd;
+    }
+
+    // ---- camera ----
+    solveCamera(t, dt);
+
+    // ---- light ----
+    var kMood = 1 - Math.exp(-2.6 * dt);
+    for (var k in targetMood) {
+      if (COLOR_KEYS[k]) { mood[k] = targetMood[k]; continue; }
+      var cur = mood[k], tg = targetMood[k];
+      mood[k] = typeof tg === 'number' ? cur + (tg - cur) * kMood : tg;
+    }
+    curSun.lerp(cSun.setHex(mood.sunCol), kMood);
+    curAmbS.lerp(cAmbS.setHex(mood.ambSky), kMood);
+    curAmbG.lerp(cAmbG.setHex(mood.ambGnd), kMood);
+    curFog.lerp(cFog.setHex(mood.fogCol), kMood);
+    L.sun.intensity = mood.sun;
+    L.sun.color.copy(curSun);
+    L.amb.intensity = mood.amb;
+    L.amb.color.copy(curAmbS);
+    L.amb.groundColor.copy(curAmbG);
+    scene.fog.near = mood.fogN;
+    scene.fog.far = mood.fogF;
+    scene.fog.color.copy(curFog);
+
+    // The sky meets the fog at the horizon, so the ground plane's edge is
+    // never visible as a seam. Both are eased as colours, not as numbers:
+    // interpolating packed hex would travel through the wrong hues.
+    if (L.skyMat) {
+      L.skyMat.uniforms.bottom.value.copy(curFog);
+      L.skyMat.uniforms.top.value.lerp(cSky.setHex(mood.skyTop), kMood);
+    }
+    renderer.toneMappingExposure = mood.exp * (1 - blind * 0.92);
+
+    // ---- practicals ----
+    // Lamp intensity comes from the mood, so it rises and falls with the
+    // scene instead of being switched by scene number.
+    var hs = SETS.residence.visible ? SETS.residence
+           : (SETS.apartment.visible ? SETS.apartment : null);
+    var lampWant = mood.lamp || 0;
+    var flick = 1 + Math.sin(t * 1.7) * 0.015;      // steady; these are bulbs
+    L.lampA.intensity = lampWant * 1.5 * flick;
+    L.lampB.intensity = lampWant * 1.1 * (2 - flick);
+    if (hs && hs.userData.lamps && hs.userData.lamps.length) {
+      var lm = hs.userData.lamps;
+      L.lampA.position.fromArray(lm[0].pos);
+      if (lm[1]) L.lampB.position.fromArray(lm[1].pos);
+      else L.lampB.intensity = 0;
+    } else {
+      L.lampA.intensity = 0;
+      L.lampB.intensity = 0;
+    }
+    // the hospital's ceiling panels, which are the only light in scene 4
+    L.fluoro.intensity = SETS.hospital.visible ? 1.5 : 0;
+
+    // ---- rain outside the residence glass ----
+    if (SETS.residence.visible && SETS.residence.userData.rain) {
+      var R = SETS.residence.userData.rain;
+      R.pts.material.opacity = (mood.rain || 0) * 0.5;
+      if ((mood.rain || 0) > 0.01) {
+        for (var ri = 0; ri < R.count; ri++) {
+          var rs = R.seed[ri];
+          R.pos[ri * 3 + 1] = 14 - ((t * rs.s + rs.y) % 14);
+        }
+        R.geo.attributes.position.needsUpdate = true;
+      }
+    }
+
+
+    // ---- subjective blindness ----
+    blind += (blindTarget - blind) * (1 - Math.exp(-1.6 * dt));
+    if (ctx.vignette) {
+      ctx.vignette.material.opacity = blind * 0.97;
+      ctx.vignette.visible = blind > 0.004;
+    }
+
+
+    renderer.render(scene, camera);
+  }
+
+  return {
+    applyBeat: applyBeat, frame: frame,
+    setBlind: function (v) { blindTarget = v; },
+    dropScales: function (t) { scales = 1; ctx.scalesT = t; },
+    get mood() { return mood; }
+  };
+}
+
+
+
+// ===== main ==============================================================
+  var DURATION = 228.28;
+  var RENDER_MODE = true;
+
+  var canvas = document.getElementById("stage");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true,
+                                           preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(1280, 720, false);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(38, 1280 / 720, 0.1, 400);
+
+  var lights = buildLights(scene);
+
+  // sets
+  var SETS = {
+    office: buildOffice(),
+    hospital: buildHospital(),
+    residence: buildResidence(),
+    apartment: buildApartment(),
+    street: buildStreet()
+  };
+  for (var sk in SETS) scene.add(SETS[sk]);
+
+  // cast
+  var cast = buildCast();
+  var allCast = castList(cast);
+  for (var ci = 0; ci < allCast.length; ci++) {
+    allCast[ci].root.visible = false;
+    scene.add(allCast[ci].root);
+  }
+
+  // Shots are derived from the cast, so they are built once the cast exists.
+  buildShots(cast);
+
+  // rain is built into the residence set; no other particle systems here.
+
+  // a black plane locked to the camera: the subjective blindness fade
+  var vignette = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true,
+                                  opacity: 0, depthTest: false, depthWrite: false }));
+  vignette.visible = false;
+  vignette.renderOrder = 999;
+  var vigCam = new THREE.Scene();
+  vigCam.add(vignette);
+  var orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  var ctx = {
+    scene: scene, camera: camera, renderer: renderer,
+    cast: cast, sets: SETS, lights: lights,
+    shaft: null, motes: null, dustRoad: null,
+    scalesFx: null, scalesT: 0, vignette: null,
+    acts: null
+  };
+
+  var film = makeFilm(ctx);
+  ctx.acts = buildActs(film);
+
+  // The blindness fade is a second pass over the finished frame.
+  var baseRender = renderer.render.bind(renderer);
+
+  var voice = document.getElementById("voice");
+  voice.src = AUDIO_SRC;
+
+  var transport = makeTransport({
+    beats: BEATS, duration: DURATION,
+    applyBeat: film.applyBeat,
+    frame: function (t, dt) {
+      film.frame(t, dt);
+      if (vignette.material.opacity > 0.004) {
+        renderer.autoClear = false;
+        baseRender(vigCam, orthoCam);
+        renderer.autoClear = true;
+      }
+    },
+    voice: voice, renderMode: RENDER_MODE
+  });
+  ctx.vignette = vignette;
+
+  // ------------------------------------------------------------- playback
+  var gate = document.getElementById("gate");
+  if (RENDER_MODE) {
+    gate.className = "off";
+    transport.reset();
+    window.__film = {
+      duration: DURATION,
+      reset: function () { transport.reset(); },
+      seekTo: function (t) { transport.advanceTo(t); },
+      grab: function (t) {
+        transport.advanceTo(t);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      },
+      // Framing check only: jump to t and settle the easing over a few
+      // frames instead of replaying the film. Not frame-exact, so never used
+      // for a real render - but camera and pose are right, which is what a
+      // look needs.
+      peek: function (t) {
+        transport.jumpTo(t, 30);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      }
+    };
+    // Debug hook: report where the camera is and who is actually in front
+    // of it. Looking at one frame cannot tell you whether a figure is
+    // missing or merely out of shot; this can.
+    window.__dbg = function () {
+      var out = { cam: camera.position.toArray().map(function (n) { return +n.toFixed(2); }),
+                  visible: [], inFrustum: [] };
+      camera.updateMatrixWorld();
+      var m = new THREE.Matrix4().multiplyMatrices(
+        camera.projectionMatrix, camera.matrixWorldInverse);
+      var fr = new THREE.Frustum().setFromProjectionMatrix(m);
+      var names = ['man','asst','wife','doc','friend'];
+      for (var i = 0; i < names.length; i++) {
+        var c = cast[names[i]];
+        if (!c || !c.root.visible) continue;
+        out.visible.push(names[i]);
+        var v = new THREE.Vector3();
+        c.head.getWorldPosition(v);
+        if (fr.containsPoint(v)) out.inFrustum.push(names[i]);
+      }
+      out.look = window.__lastLook ? window.__lastLook.toArray().map(function(n){return +n.toFixed(2);}) : null;
+      out.asstPos = cast.asst.root.position.toArray().map(function(n){return +n.toFixed(2);});
+      out.asstRotY = +cast.asst.root.rotation.y.toFixed(2);
+      out.manPos = cast.man.root.position.toArray().map(function(n){return +n.toFixed(2);});
+      out.sets = {};
+      for (var sk in SETS) {
+        out.sets[sk] = SETS[sk].visible ? SETS[sk].children.length : false;
+      }
+      return out;
+    };
+    window.__filmReady = true;
+  } else {
+    transport.reset();
+    var start = function () {
+      gate.className = "off";
+      transport.play();
+    };
+    gate.addEventListener("click", start);
+    window.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") start();
+    });
+    window.__filmReady = true;
+  }
+
+})();
+</script>
