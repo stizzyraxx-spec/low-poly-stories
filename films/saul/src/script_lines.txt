@@ -1,0 +1,41 @@
+SAUL|Arrest them! Every last one of them! Anyone preaching the name of Jesus must be brought before the authorities!
+CHRISTIAN|But we've done nothing wrong! We only follow the teachings of Jesus!
+SAUL|That man was a false Messiah! And I will not rest until his followers are silenced!
+COMPANION|Saul, where are you going?
+SAUL|To Damascus. I've received permission to arrest anyone who follows this Jesus. Men or women, it makes no difference. I'll bring them back to Jerusalem in chains!
+COMPANION|Then may God be with you on your journey.
+SAUL|Wait! What is that light? It's brighter than the sun! I can't see!
+JESUS|Saul! Saul! Why are you persecuting me?
+SAUL|Who are you, Lord?
+JESUS|I am Jesus, whom you are persecuting.
+SAUL|Jesus? But... you're dead!
+JESUS|Rise and enter the city. There you will be told what you must do.
+SAUL|I can't see! My eyes! Everything is dark!
+COMPANION|Saul! What's happened to you?
+SAUL|I heard a voice... It was Jesus! He spoke to me! Please, help me. I cannot see!
+COMPANION|Come, we'll lead you into Damascus.
+SAUL|Three days have passed, and I still cannot see. I haven't eaten or drunk anything. Lord, what have I done?
+JESUS|Ananias!
+ANANIAS|Yes, Lord?
+JESUS|Go to the house of Judas on Straight Street. Ask for a man named Saul of Tarsus. He is praying.
+ANANIAS|Lord, I've heard about this man! He's imprisoned your followers and brought terrible suffering upon your people!
+JESUS|Go, for he is my chosen instrument to carry my name before the nations, kings, and the people of Israel.
+ANANIAS|Then I will obey you, Lord.
+ANANIAS|Saul? Are you here?
+SAUL|Who's there?
+ANANIAS|My name is Ananias. The Lord Jesus, who appeared to you on the road, has sent me so that you may see again and be filled with the Holy Spirit.
+SAUL|Jesus sent you? Even after everything I've done?
+ANANIAS|Yes, brother Saul. Receive your sight.
+SAUL|I... I can see! The darkness is gone! God has opened my eyes!
+ANANIAS|Then rise, Saul, and be baptized.
+SAUL|I spent my life believing I was serving God, yet I was fighting against His own Son.
+ANANIAS|And what will you do now?
+SAUL|I will preach the truth. Jesus is the Son of God!
+CITIZEN_A|Isn't that the man who came here to arrest the followers of Jesus?
+CITIZEN_B|It is! He was dragging Christians away in chains! Now he's preaching their message?
+SAUL|Listen to me! I once persecuted those who followed Jesus. I believed they were my enemies. But on that road, I discovered that I was the one who was blind long before I lost my sight.
+CITIZEN_A|And now?
+SAUL|Now I know the truth. Jesus Christ is the Son of God, and I will spend my life proclaiming His name!
+CITIZEN_B|Even after all the evil you've done?
+SAUL|If God can show mercy to a man like me, then no one is beyond the reach of His grace.
+NARRATOR|For the man who once hunted Christians had become a servant of the very Savior he tried to destroy.
