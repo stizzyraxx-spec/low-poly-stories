@@ -1,0 +1,2272 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Conversion of Saul</title>
+<style>
+  html,body{margin:0;background:#000;overflow:hidden}
+  #stage{display:block;width:100vw;height:56.25vw;max-height:100vh;max-width:177.78vh;
+         position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+  #gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:#000;color:#e8dcc8;font:600 15px/1.5 system-ui,-apple-system,sans-serif;
+        letter-spacing:.18em;text-transform:uppercase;cursor:pointer;z-index:9999}
+  #gate.off{display:none}
+</style>
+<canvas id="stage" width="1280" height="720"></canvas>
+<audio id="voice" preload="auto"></audio>
+<div id="gate">Play &mdash; sound on</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var AUDIO_SRC = "";
+  var THREE = window.THREE;
+
+  // Deterministic pseudo-random. The render is sharded across processes and
+  // restarted after crashes, so every frame must be reproducible; nothing may
+  // call Math.random() once the scene is built.
+  var NSEED = 1973;
+  function rnd() {
+    NSEED = (NSEED * 1103515245 + 12345) & 0x7fffffff;
+    return NSEED / 0x7fffffff;
+  }
+
+  function mat(hex, o) {
+    o = o || {};
+    var m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
+    if (o.transparent) { m.transparent = true; m.opacity = o.opacity; }
+    if (o.emissive) m.emissive = new THREE.Color(o.emissive);
+    if (o.side) m.side = o.side;
+    return m;
+  }
+  function emat(hex, op) {
+    return new THREE.MeshBasicMaterial({ color: hex, transparent: true,
+                                         opacity: op === undefined ? 1 : op });
+  }
+
+// ===== materials/palette.js ====================================
+// materials/palette.js — first-century Judea.
+// Sandstone and dust outdoors, plaster and lamplight indoors, undyed wool on
+// most bodies. Saul alone wears a dark robe before the road and a pale one
+// after it, so his change of heart is legible at wide shot sizes.
+var PAL = {
+  // masonry and architecture
+  sandLit: 0xd9b382, sand: 0xc49a6c, sandDark: 0x9a7450, sandShade: 0x7a5a3e,
+  plaster: 0xcfb496, plasterDark: 0x9c8468, plasterCool: 0xa89a86,
+  roof: 0xa8764c, roofDark: 0x7d5636,
+  column: 0xd2b58e, columnDark: 0xa98a63,
+
+  // landscape
+  ground: 0xbf9a6e, groundDry: 0xa98556, road: 0xc9a478,
+  rock: 0x8d7a62, rockDark: 0x6d5c48,
+  hill: 0x9c7f5c, hillFar: 0x8a7a66, mtn: 0x6f6a63, mtnFar: 0x7d7a74,
+  scrub: 0x6b6f44, scrubDry: 0x8a7f4e, olive: 0x5c6b43, trunk: 0x5a4632,
+
+  // wood, cloth, clay
+  wood: 0x6b4d33, woodDark: 0x4a3524, woodLight: 0x8a6a46,
+  clay: 0xa87c58, clayDark: 0x7d5a3e, rug: 0x8a4f3c, rugAlt: 0x6b5340,
+  water: 0x6f8fa8,
+
+  // people
+  skinS: 0xc08a5e, skinA: 0xb4805a, skinC: 0xcb9468, skinD: 0xa87350,
+  robeSaulDark: 0x3b3340, robeSaulLight: 0xd8cdb8,
+  robeAnanias: 0xa9a08c,
+  robeCrowdA: 0x8d7f6a, robeCrowdB: 0x7a6e5e, robeCrowdC: 0x9c8d72,
+  robeCrowdD: 0x6d6456, robeCrowdE: 0x857a63,
+  hairDark: 0x2a1f18, hairGrey: 0x8a8278, hairMid: 0x45342a,
+  leather: 0x5c4028, armour: 0x6e6a62, armourLit: 0x8a867c, spear: 0x4a3a2a,
+
+  // light
+  lampGlow: 0xffb45a, holyWhite: 0xfff6e0, holyGold: 0xffd98a,
+  nightSky: 0x1a1a26, duskSky: 0x3d3348
+};
+
+
+// ===== characters/rig.js =======================================
+// characters/rig.js — one jointed low-poly body, reused for every character.
+//
+// The joint stack is hips -> torso -> chest -> neck -> head, so a curved spine
+// and a lowered head compose instead of fighting each other. Faces have no
+// blend shapes: expression is brow angle, eyelid position, jaw opening and the
+// line of the shoulders, which is all that reads at these shot sizes anyway.
+//
+// Every character is built from this one function. Variation comes from cfg
+// (skin, robe, hair, height, build, headwear) rather than from separate
+// meshes, so a crowd is cheap and no two figures are identical.
+
+function buildPerson(cfg) {
+  cfg = cfg || {};
+  var P = new THREE.Group();
+  var skin = mat(cfg.skin || PAL.skinA);
+  var cloth = mat(cfg.robe || PAL.robeCrowdA);
+  var under = mat(cfg.under || cfg.robe || PAL.robeCrowdB);
+  var hairM = mat(cfg.hair || PAL.hairDark);
+  var scale = cfg.height || 1;
+  var build = cfg.build || 1;          // 1 = average, >1 heavier
+  P.scale.setScalar(scale);
+
+  // ---- hips / torso / chest ----
+  var hips = new THREE.Group();
+  hips.position.y = 0.92;
+  P.add(hips);
+
+  var torso = new THREE.Group();
+  hips.add(torso);
+
+  var pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.40 * build, 0.24, 0.26), cloth);
+  pelvis.position.y = 0.10;
+  pelvis.castShadow = true;
+  torso.add(pelvis);
+
+  var chest = new THREE.Group();
+  chest.position.y = 0.26;
+  torso.add(chest);
+
+  var ribs = new THREE.Mesh(new THREE.BoxGeometry(0.46 * build, 0.40, 0.28), cloth);
+  ribs.position.y = 0.18;
+  ribs.castShadow = true;
+  chest.add(ribs);
+
+  // the robe falls as a tapered skirt - gives the silhouette its period read
+  var robe = new THREE.Mesh(new THREE.CylinderGeometry(0.30 * build, 0.42 * build, 0.95, 7, 1, true), cloth);
+  robe.position.y = -0.38;
+  robe.castShadow = true;
+  torso.add(robe);
+
+  if (cfg.sash) {
+    var sash = new THREE.Mesh(new THREE.BoxGeometry(0.48 * build, 0.09, 0.30), mat(cfg.sash));
+    sash.position.y = 0.00;
+    chest.add(sash);
+  }
+  if (cfg.belt) {
+    var belt = new THREE.Mesh(new THREE.BoxGeometry(0.42 * build, 0.07, 0.28), mat(PAL.leather));
+    belt.position.y = 0.00;
+    torso.add(belt);
+  }
+  if (cfg.mantle) {   // a cloak over one shoulder
+    var mantle = new THREE.Mesh(new THREE.BoxGeometry(0.50 * build, 0.52, 0.10), mat(cfg.mantle));
+    mantle.position.set(0, 0.10, -0.17);
+    chest.add(mantle);
+  }
+
+  // ---- neck / head ----
+  var neck = new THREE.Group();
+  neck.position.y = 0.40;
+  chest.add(neck);
+
+  var neckM = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.13, 6), skin);
+  neckM.position.y = 0.05;
+  neck.add(neckM);
+
+  var head = new THREE.Group();
+  head.position.y = 0.17;
+  neck.add(head);
+
+  var skull = new THREE.Mesh(new THREE.BoxGeometry(0.235, 0.27, 0.235), skin);
+  skull.castShadow = true;
+  head.add(skull);
+
+  var brow = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.03), skin);
+  brow.position.set(0, 0.055, 0.122);
+  head.add(brow);
+
+  // jaw hinges at the back so the chin swings, as a jaw does
+  var jaw = new THREE.Group();
+  jaw.position.set(0, -0.085, -0.06);
+  head.add(jaw);
+  var jawM = new THREE.Mesh(new THREE.BoxGeometry(0.205, 0.085, 0.215), skin);
+  jawM.position.set(0, -0.02, 0.085);
+  jaw.add(jawM);
+
+  var mouth = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.022, 0.012), mat(0x4a2c22));
+  mouth.position.set(0, -0.012, 0.196);
+  jaw.add(mouth);
+
+  function eye(sx) {
+    var g = new THREE.Group();
+    g.position.set(sx * 0.062, 0.008, 0.108);
+    var white = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.040, 0.012), mat(0xf0e6d8));
+    g.add(white);
+    var iris = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.026, 0.014), mat(cfg.eye || 0x3b2a1c));
+    iris.position.z = 0.004;
+    g.add(iris);
+    // lid slides down over the eye - blinks and the half-lidded blind look
+    var lid = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.044, 0.016), skin);
+    lid.position.set(0, 0.044, 0.006);
+    g.add(lid);
+    var browBar = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.016, 0.014), hairM);
+    browBar.position.set(0, 0.052, 0.012);
+    g.add(browBar);
+    head.add(g);
+    return { g: g, lid: lid, brow: browBar, iris: iris };
+  }
+  var eyeL = eye(-1), eyeR = eye(1);
+
+  // ---- hair / beard / headwear ----
+  if (!cfg.bald) {
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(0.252, 0.10, 0.252), hairM);
+    cap.position.y = 0.125;
+    head.add(cap);
+    var backHair = new THREE.Mesh(new THREE.BoxGeometry(0.248, 0.16, 0.06), hairM);
+    backHair.position.set(0, 0.03, -0.106);
+    head.add(backHair);
+  }
+  if (cfg.beard) {
+    var beard = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.12, 0.075), mat(cfg.beardColor || cfg.hair || PAL.hairDark));
+    beard.position.set(0, -0.055, 0.145);
+    jaw.add(beard);
+  }
+  if (cfg.headwrap) {
+    var wrap = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.095, 0.27), mat(cfg.headwrap));
+    wrap.position.y = 0.145;
+    head.add(wrap);
+    var tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.05), mat(cfg.headwrap));
+    tail.position.set(0.09, 0.0, -0.12);
+    head.add(tail);
+  }
+  if (cfg.helmet) {
+    var helm = new THREE.Mesh(new THREE.BoxGeometry(0.265, 0.13, 0.265), mat(PAL.armour));
+    helm.position.y = 0.135;
+    head.add(helm);
+    var crest = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.085, 0.24), mat(PAL.armourLit));
+    crest.position.y = 0.21;
+    head.add(crest);
+  }
+
+  // ---- arms ----
+  function arm(side) {
+    var sh = new THREE.Group();
+    sh.position.set(side * 0.255 * build, 0.30, 0);
+    chest.add(sh);
+    var upper = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.30, 0.095), cloth);
+    upper.position.y = -0.15;
+    upper.castShadow = true;
+    sh.add(upper);
+    var el = new THREE.Group();
+    el.position.y = -0.30;
+    sh.add(el);
+    var fore = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.28, 0.082), skin);
+    fore.position.y = -0.14;
+    fore.castShadow = true;
+    el.add(fore);
+    var hand = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.10, 0.075), skin);
+    hand.position.y = -0.31;
+    el.add(hand);
+    sh.rotation.z = side * 0.09;
+    return { sh: sh, el: el, hand: hand };
+  }
+  var armL = arm(-1), armR = arm(1);
+
+  // ---- legs (hidden under the robe but they carry the walk) ----
+  function leg(side) {
+    var hip = new THREE.Group();
+    hip.position.set(side * 0.115, 0.0, 0);
+    hips.add(hip);
+    var thigh = new THREE.Mesh(new THREE.BoxGeometry(0.125, 0.42, 0.13), under);
+    thigh.position.y = -0.21;
+    hip.add(thigh);
+    var knee = new THREE.Group();
+    knee.position.y = -0.42;
+    hip.add(knee);
+    var shin = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.42, 0.11), under);
+    shin.position.y = -0.21;
+    knee.add(shin);
+    var foot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.055, 0.225), mat(PAL.leather));
+    foot.position.set(0, -0.45, 0.045);
+    knee.add(foot);
+    return { hip: hip, knee: knee, foot: foot };
+  }
+  var legL = leg(-1), legR = leg(1);
+
+  return {
+    root: P, hips: hips, torso: torso, chest: chest, neck: neck, head: head,
+    jaw: jaw, mouth: mouth, brow: brow, eyeL: eyeL, eyeR: eyeR,
+    armL: armL, armR: armR, legL: legL, legR: legR, robe: robe,
+    // per-character animation state, eased toward targets every frame
+    s: {
+      lean: 0, slump: 0, headDown: 0, headTurn: 0, headTilt: 0,
+      browAngle: 0, browRaise: 0, lidDrop: 0, jawOpen: 0,
+      armUpL: 0, armUpR: 0, reach: 0, point: 0, shield: 0,
+      kneel: 0, fallen: 0, walk: 0, walkPhase: 0, talking: 0,
+      blinkT: rnd() * 3, breathT: rnd() * 6.28, sway: rnd() * 6.28
+    }
+  };
+}
+
+
+// ===== animations/perform.js ===================================
+// animations/perform.js — what makes a figure look alive.
+//
+// Two layers. Involuntary motion (breath, blink, weight shift, the drift of a
+// head) runs on its own timers and never stops, so nobody is ever a statue.
+// Voluntary motion (point, shield, kneel, reach, walk) is a set of 0..1 targets
+// that beats set and this module eases toward, so a cut never catches a body
+// mid-snap.
+
+function ease(cur, target, rate, dt) {
+  return cur + (target - cur) * (1 - Math.exp(-rate * dt));
+}
+
+// Mouths open only while their own line is being spoken. There is no forced
+// aligner on this machine, so this is a speech ENVELOPE, not visemes: the jaw
+// rides a fast carrier (syllable-rate) under a slower amplitude curve, and
+// closes in the measured pauses inside the line. It reads correctly at these
+// shot sizes; it is not phoneme-matched, and the storyboard says so.
+function jawEnvelope(t, lineT, lineD, seed) {
+  if (lineT === null || t < lineT || t > lineT + lineD) return 0;
+  var u = (t - lineT) / Math.max(0.0001, lineD);
+  // taper in and out so a line does not begin or end with a snapped jaw
+  var amp = Math.min(1, Math.min(u, 1 - u) * 9);
+  var carrier = 0.5 + 0.5 * Math.sin((t + seed) * 15.5);
+  var slow = 0.55 + 0.45 * Math.sin((t * 2.3 + seed) * 1.7);
+  return amp * carrier * slow;
+}
+
+function animatePerson(c, t, dt) {
+  var s = c.s;
+
+  // ---- involuntary ----
+  s.breathT += dt * (0.95 + s.talking * 0.5 + s.fallen * 0.9);
+  var breath = Math.sin(s.breathT) * 0.5 + 0.5;
+  c.chest.scale.set(1 + breath * 0.022, 1 + breath * 0.016, 1 + breath * 0.026);
+  c.chest.position.y = 0.26 + breath * 0.009;
+
+  s.sway += dt * 0.37;
+  var sway = Math.sin(s.sway) * 0.012 + Math.sin(s.sway * 0.41) * 0.008;
+
+  s.blinkT -= dt;
+  var blink = 0;
+  if (s.blinkT < 0) {
+    blink = Math.min(1, -s.blinkT * 11);
+    if (s.blinkT < -0.14) { s.blinkT = 2.1 + rnd() * 3.4; }
+  }
+
+  // ---- spine ----
+  var leanA = s.lean * 0.21 + s.fallen * 0.1;
+  c.torso.rotation.x = ease(c.torso.rotation.x, leanA - s.slump * 0.05, 7, dt);
+  c.torso.rotation.z = ease(c.torso.rotation.z, sway + s.fallen * 0.14, 5, dt);
+  c.chest.rotation.x = ease(c.chest.rotation.x, s.slump * 0.17, 6, dt);
+
+  // ---- head ----
+  var hd = s.headDown * 0.34 + s.slump * 0.1 - s.browRaise * 0.05;
+  c.neck.rotation.x = ease(c.neck.rotation.x, hd, 7, dt);
+  c.head.rotation.y = ease(c.head.rotation.y, s.headTurn * 0.5, 6, dt);
+  c.head.rotation.z = ease(c.head.rotation.z, s.headTilt * 0.22 + sway * 0.5, 6, dt);
+  c.head.rotation.x = ease(c.head.rotation.x, Math.sin(s.breathT * 0.31) * 0.012, 4, dt);
+
+  // ---- face ----
+  c.jaw.rotation.x = ease(c.jaw.rotation.x, s.jawOpen * 0.30, 26, dt);
+  c.mouth.scale.y = 1 + s.jawOpen * 2.2;
+
+  // lids: blink, plus the heavy half-lidded look of the blind stretch
+  var lidY = 0.044 - (blink * 0.046) - (s.lidDrop * 0.030);
+  c.eyeL.lid.position.y = ease(c.eyeL.lid.position.y, lidY, 24, dt);
+  c.eyeR.lid.position.y = c.eyeL.lid.position.y;
+
+  // brows do the emotional work: angry drives the inner ends down, fear up
+  var bz = s.browAngle * 0.42;
+  c.eyeL.brow.rotation.z = ease(c.eyeL.brow.rotation.z, -bz, 10, dt);
+  c.eyeR.brow.rotation.z = ease(c.eyeR.brow.rotation.z, bz, 10, dt);
+  var by = 0.052 + s.browRaise * 0.022 - Math.max(0, s.browAngle) * 0.012;
+  c.eyeL.brow.position.y = ease(c.eyeL.brow.position.y, by, 10, dt);
+  c.eyeR.brow.position.y = c.eyeL.brow.position.y;
+
+  // eyes go dead during blindness - no iris tracking, nothing to track with
+  var irisZ = 0.004 - s.lidDrop * 0.002;
+  c.eyeL.iris.position.z = irisZ;
+  c.eyeR.iris.position.z = irisZ;
+
+  // ---- arms ----
+  // shield: both forearms up across the face, the Damascus-road gesture
+  var shL = -s.armUpL * 1.5 - s.shield * 2.25 - s.reach * 1.35 - s.point * 0.2;
+  var shR = -s.armUpR * 1.5 - s.shield * 2.25 - s.reach * 1.35 - s.point * 1.6;
+  c.armL.sh.rotation.x = ease(c.armL.sh.rotation.x, shL, 8, dt);
+  c.armR.sh.rotation.x = ease(c.armR.sh.rotation.x, shR, 8, dt);
+  c.armL.sh.rotation.z = ease(c.armL.sh.rotation.z, -0.09 - s.shield * 0.5 + s.reach * 0.22, 8, dt);
+  c.armR.sh.rotation.z = ease(c.armR.sh.rotation.z, 0.09 + s.shield * 0.5 - s.reach * 0.22 - s.point * 0.3, 8, dt);
+  c.armL.el.rotation.x = ease(c.armL.el.rotation.x, -s.shield * 1.5 - s.armUpL * 0.7 - s.reach * 0.25, 8, dt);
+  c.armR.el.rotation.x = ease(c.armR.el.rotation.x, -s.shield * 1.5 - s.armUpR * 0.7 - s.reach * 0.25 - s.point * 0.1, 8, dt);
+
+  // talking gesture: the forward hand lifts a little on stressed syllables
+  if (s.talking > 0.01 && s.shield < 0.1 && s.reach < 0.1) {
+    var g = Math.sin(t * 3.1) * 0.5 + 0.5;
+    c.armR.sh.rotation.x -= s.talking * g * 0.26;
+    c.armR.el.rotation.x -= s.talking * g * 0.2;
+  }
+
+  // ---- legs: walk cycle, kneel, collapse ----
+  if (s.walk > 0.01) {
+    s.walkPhase += dt * 4.6 * s.walk;
+    var w = s.walkPhase;
+    c.legL.hip.rotation.x = Math.sin(w) * 0.55 * s.walk;
+    c.legR.hip.rotation.x = Math.sin(w + Math.PI) * 0.55 * s.walk;
+    c.legL.knee.rotation.x = Math.max(0, -Math.sin(w - 0.6)) * 0.72 * s.walk;
+    c.legR.knee.rotation.x = Math.max(0, -Math.sin(w + Math.PI - 0.6)) * 0.72 * s.walk;
+    // the body rises and falls on the stride, which is what sells a walk
+    c.hips.position.y = 0.92 + Math.abs(Math.sin(w)) * 0.028 * s.walk;
+    c.armL.sh.rotation.x += Math.sin(w + Math.PI) * 0.3 * s.walk;
+    c.armR.sh.rotation.x += Math.sin(w) * 0.3 * s.walk;
+  } else {
+    c.legL.hip.rotation.x = ease(c.legL.hip.rotation.x, s.kneel * -1.45, 7, dt);
+    c.legR.hip.rotation.x = ease(c.legR.hip.rotation.x, s.kneel * -0.3, 7, dt);
+    c.legL.knee.rotation.x = ease(c.legL.knee.rotation.x, s.kneel * 1.5, 7, dt);
+    c.legR.knee.rotation.x = ease(c.legR.knee.rotation.x, s.kneel * 1.5, 7, dt);
+    c.hips.position.y = ease(c.hips.position.y,
+      0.92 - s.kneel * 0.42 - s.fallen * 0.66, 6, dt);
+  }
+
+  // a fallen body pitches forward onto its hands
+  c.root.rotation.x = ease(c.root.rotation.x, s.fallen * 0.3, 5, dt);
+}
+
+
+// ===== environments/sets.js ====================================
+// environments/sets.js — the film's nine locations.
+//
+// Each set is a Group that is hidden until its scene. Only one is visible at a
+// time, so triangle count stays low even though the film travels from
+// Jerusalem to the Damascus road to three interiors and a public courtyard.
+//
+// Shared builders (wall, building, rock, hill, olive tree) are reused across
+// sets, which is what keeps the architecture consistent between cities.
+
+// ---------------------------------------------------------------- builders
+
+function stoneWall(w, h, d, colA, colB) {
+  // coursed masonry: alternating rows, offset by half a block
+  var g = new THREE.Group();
+  var bw = 1.15, bh = 0.52;
+  var cols = Math.max(1, Math.round(w / bw)), rows = Math.max(1, Math.round(h / bh));
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      var b = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.97, bh * 0.94, d),
+        mat(r % 2 ? colA : colB));
+      b.position.set(-w / 2 + c * bw + (r % 2) * bw * 0.5 + bw / 2,
+                     bh / 2 + r * bh, 0);
+      b.receiveShadow = true;
+      b.castShadow = true;
+      g.add(b);
+    }
+  }
+  return g;
+}
+
+function building(w, h, d, opts) {
+  opts = opts || {};
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    mat(opts.col || PAL.sand));
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  g.add(body);
+
+  // parapet, so rooflines are not bare boxes
+  var par = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, 0.16, d * 1.04),
+    mat(opts.colTop || PAL.sandDark));
+  par.position.y = h + 0.08;
+  g.add(par);
+
+  if (opts.door) {
+    var dr = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.35, 0.08), mat(PAL.woodDark));
+    dr.position.set(opts.doorX || 0, 0.675, d / 2 + 0.04);
+    g.add(dr);
+  }
+  var nWin = opts.windows === undefined ? 2 : opts.windows;
+  for (var i = 0; i < nWin; i++) {
+    var win = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.44, 0.07),
+      mat(0x2a2017));
+    win.position.set(-w / 2 + (i + 1) * (w / (nWin + 1)), h * 0.62, d / 2 + 0.035);
+    g.add(win);
+  }
+  if (opts.awning) {
+    var aw = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, 0.05, 1.5),
+      mat(opts.awning));
+    aw.position.set(0, h * 0.5, d / 2 + 0.75);
+    aw.rotation.x = 0.13;
+    aw.castShadow = true;
+    g.add(aw);
+    for (var p = -1; p <= 1; p += 2) {
+      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, h * 0.5, 5),
+        mat(PAL.wood));
+      pole.position.set(p * w * 0.35, h * 0.25, d / 2 + 1.42);
+      g.add(pole);
+    }
+  }
+  return g;
+}
+
+function rock(r, col) {
+  var m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), mat(col || PAL.rock));
+  m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+  m.scale.set(1, 0.62 + rnd() * 0.5, 1);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+function hill(r, h, col) {
+  var m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7, 1), mat(col));
+  m.rotation.y = rnd() * 3;
+  return m;
+}
+
+function oliveTree(s) {
+  var g = new THREE.Group();
+  var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.11 * s, 1.1 * s, 5),
+    mat(PAL.trunk));
+  tr.position.y = 0.55 * s;
+  tr.castShadow = true;
+  g.add(tr);
+  for (var i = 0; i < 3; i++) {
+    var cl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42 * s, 0), mat(PAL.olive));
+    cl.position.set((rnd() - 0.5) * 0.5 * s, (1.1 + rnd() * 0.42) * s, (rnd() - 0.5) * 0.5 * s);
+    cl.scale.y = 0.78;
+    cl.castShadow = true;
+    g.add(cl);
+  }
+  return g;
+}
+
+function scrub(s) {
+  var m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2 * s, 0),
+    mat(rnd() > 0.5 ? PAL.scrub : PAL.scrubDry));
+  m.scale.set(1, 0.55, 1);
+  return m;
+}
+
+function clayJug(s) {
+  var g = new THREE.Group();
+  var b = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * s, 0.07 * s, 0.26 * s, 7),
+    mat(PAL.clay));
+  b.position.y = 0.13 * s;
+  b.castShadow = true;
+  g.add(b);
+  var nk = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * s, 0.055 * s, 0.09 * s, 6),
+    mat(PAL.clayDark));
+  nk.position.y = 0.3 * s;
+  g.add(nk);
+  return g;
+}
+
+function oilLamp() {
+  var g = new THREE.Group();
+  var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.055, 7),
+    mat(PAL.clayDark));
+  g.add(bowl);
+  var flame = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.075, 5),
+    emat(PAL.lampGlow, 0.92));
+  flame.position.y = 0.065;
+  g.add(flame);
+  return { root: g, flame: flame };
+}
+
+function groundPlane(size, col) {
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(size, size, 1, 1), mat(col));
+  m.rotation.x = -Math.PI / 2;
+  m.receiveShadow = true;
+  return m;
+}
+
+// ------------------------------------------------------- 1: Jerusalem street
+
+function buildJerusalem() {
+  var S = new THREE.Group();
+  S.add(groundPlane(160, PAL.ground));
+
+  // a street running away from camera, buildings tight on both sides
+  var awnings = [PAL.rug, PAL.rugAlt, PAL.robeCrowdB, PAL.rug];
+  for (var i = 0; i < 9; i++) {
+    var z = 2 - i * 4.4;
+    var hL = 3.2 + rnd() * 2.6, hR = 3.0 + rnd() * 2.8;
+    var bL = building(3.6, hL, 3.4, {
+      col: i % 2 ? PAL.sand : PAL.sandLit, door: true,
+      awning: i % 3 === 0 ? awnings[i % 4] : null, windows: 2
+    });
+    bL.position.set(-4.3, 0, z);
+    bL.rotation.y = Math.PI / 2;
+    S.add(bL);
+    var bR = building(3.6, hR, 3.4, {
+      col: i % 2 ? PAL.sandLit : PAL.sand, door: i % 2 === 0,
+      awning: i % 3 === 1 ? awnings[(i + 2) % 4] : null, windows: 2
+    });
+    bR.position.set(4.3, 0, z);
+    bR.rotation.y = -Math.PI / 2;
+    S.add(bR);
+  }
+
+  // stone stair up to a doorway, and the city wall closing the far end
+  var stair = new THREE.Group();
+  for (var s = 0; s < 5; s++) {
+    var st = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 0.46), mat(PAL.sandDark));
+    st.position.set(0, 0.1 + s * 0.2, -s * 0.46);
+    st.receiveShadow = true;
+    stair.add(st);
+  }
+  stair.position.set(-2.6, 0, -16);
+  S.add(stair);
+
+  var wall = stoneWall(26, 6.4, 1.2, PAL.sandDark, PAL.sandShade);
+  wall.position.set(0, 0, -34);
+  S.add(wall);
+  for (var t = -1; t <= 1; t += 2) {
+    var tower = building(3.0, 8.2, 3.0, { col: PAL.sandDark, windows: 1 });
+    tower.position.set(t * 9, 0, -34);
+    S.add(tower);
+  }
+
+  // market stalls and pottery, the lived-in detail
+  for (var m2 = 0; m2 < 7; m2++) {
+    var stall = new THREE.Group();
+    var tbl = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.8), mat(PAL.wood));
+    tbl.position.y = 0.72;
+    tbl.castShadow = true;
+    stall.add(tbl);
+    for (var lg = 0; lg < 4; lg++) {
+      var L = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), mat(PAL.woodDark));
+      L.position.set((lg % 2 ? 0.66 : -0.66), 0.36, (lg < 2 ? 0.32 : -0.32));
+      stall.add(L);
+    }
+    for (var j = 0; j < 3; j++) {
+      var jug = clayJug(0.8);
+      jug.position.set(-0.5 + j * 0.5, 0.76, 0);
+      stall.add(jug);
+    }
+    stall.position.set(m2 % 2 ? -2.7 : 2.7, 0, -1 - m2 * 3.1);
+    stall.rotation.y = m2 % 2 ? 0.3 : -0.3;
+    S.add(stall);
+  }
+  for (var k = 0; k < 14; k++) {
+    var jg = clayJug(0.7 + rnd() * 0.5);
+    jg.position.set((rnd() - 0.5) * 7, 0, -rnd() * 24);
+    S.add(jg);
+  }
+
+  S.visible = false;
+  return S;
+}
+
+// --------------------------------------------------- 2/3/4: the Damascus road
+
+function buildRoad() {
+  var S = new THREE.Group();
+  S.add(groundPlane(400, PAL.groundDry));
+
+  // the road itself, a long pale strip running to the horizon
+  var road = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 300), mat(PAL.road));
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(0, 0.012, -120);
+  road.receiveShadow = true;
+  S.add(road);
+
+  // rocks lining the road - these cast the hard shadows in the light scene
+  for (var i = 0; i < 90; i++) {
+    var side = rnd() > 0.5 ? 1 : -1;
+    var r = rock(0.25 + rnd() * 0.85, rnd() > 0.6 ? PAL.rockDark : PAL.rock);
+    r.position.set(side * (3.1 + rnd() * 14), 0, 8 - rnd() * 150);
+    S.add(r);
+  }
+  // a few big boulders near the conversion point for shadow drama
+  var bigs = [[-4.6, -3.2, 1.5], [5.2, -6.0, 1.9], [-6.4, -9.5, 1.3], [6.8, -1.5, 1.1]];
+  for (var b = 0; b < bigs.length; b++) {
+    var bb = rock(bigs[b][2], PAL.rockDark);
+    bb.position.set(bigs[b][0], 0, bigs[b][1]);
+    S.add(bb);
+  }
+
+  for (var s2 = 0; s2 < 70; s2++) {
+    var sc = scrub(0.7 + rnd() * 0.9);
+    sc.position.set((rnd() - 0.5) * 60, 0.05, 10 - rnd() * 160);
+    S.add(sc);
+  }
+  for (var tr = 0; tr < 14; tr++) {
+    var ot = oliveTree(0.9 + rnd() * 0.7);
+    ot.position.set((rnd() > 0.5 ? 1 : -1) * (7 + rnd() * 22), 0, -rnd() * 130);
+    S.add(ot);
+  }
+
+  // dry hills, then mountains, then the far haze - three depth bands
+  for (var h = 0; h < 22; h++) {
+    var hl = hill(9 + rnd() * 16, 4 + rnd() * 7, h % 2 ? PAL.hill : PAL.hillFar);
+    hl.position.set((rnd() - 0.5) * 220, 0, -60 - rnd() * 90);
+    S.add(hl);
+  }
+  for (var mt = 0; mt < 12; mt++) {
+    var mm = hill(26 + rnd() * 34, 15 + rnd() * 22, mt % 2 ? PAL.mtn : PAL.mtnFar);
+    mm.position.set((rnd() - 0.5) * 340, 0, -190 - rnd() * 110);
+    S.add(mm);
+  }
+
+  S.visible = false;
+  return S;
+}
+
+// ------------------------------------------- 5/7: the house on Straight Street
+
+function buildHouse(cfg) {
+  cfg = cfg || {};
+  var S = new THREE.Group();
+
+  var fl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), mat(PAL.clayDark));
+  fl.rotation.x = -Math.PI / 2;
+  fl.receiveShadow = true;
+  S.add(fl);
+
+  // three plastered walls, rough and warm
+  var back = new THREE.Mesh(new THREE.PlaneGeometry(13, 5.2), mat(PAL.plaster));
+  back.position.set(0, 2.6, -3.3);
+  back.receiveShadow = true;
+  S.add(back);
+  var left = new THREE.Mesh(new THREE.PlaneGeometry(9, 5.2), mat(PAL.plasterDark));
+  left.position.set(-4.4, 2.6, 0.5);
+  left.rotation.y = Math.PI / 2;
+  left.receiveShadow = true;
+  S.add(left);
+  var right = new THREE.Mesh(new THREE.PlaneGeometry(9, 5.2), mat(PAL.plasterCool));
+  right.position.set(4.4, 2.6, 0.5);
+  right.rotation.y = -Math.PI / 2;
+  right.receiveShadow = true;
+  S.add(right);
+
+  // beamed ceiling
+  for (var bm = 0; bm < 7; bm++) {
+    var beam = new THREE.Mesh(new THREE.BoxGeometry(9, 0.17, 0.17), mat(PAL.woodDark));
+    beam.position.set(0, 3.5, -3.0 + bm * 1.1);
+    S.add(beam);
+  }
+
+  // the narrow window that carries the day/night passage
+  var winFrame = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.25, 0.12), mat(PAL.plasterDark));
+  winFrame.position.set(cfg.winX === undefined ? -2.4 : cfg.winX, 2.3, -3.26);
+  S.add(winFrame);
+  var winLight = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 1.12), emat(0xffe6b0, 0.9));
+  winLight.position.set(cfg.winX === undefined ? -2.4 : cfg.winX, 2.3, -3.18);
+  S.add(winLight);
+
+  // furniture: a low bench, a mat, jugs, a shelf
+  var bench = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 0.62), mat(PAL.wood));
+  bench.position.set(cfg.benchX === undefined ? 0.4 : cfg.benchX, 0.42, -1.1);
+  bench.castShadow = true;
+  S.add(bench);
+  for (var bl = 0; bl < 4; bl++) {
+    var bL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.42, 0.1), mat(PAL.woodDark));
+    bL.position.set((cfg.benchX === undefined ? 0.4 : cfg.benchX) + (bl % 2 ? 0.62 : -0.62),
+                    0.21, -1.1 + (bl < 2 ? 0.22 : -0.22));
+    S.add(bL);
+  }
+
+  var rug = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 2.2), mat(PAL.rug));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(0.2, 0.013, 0.3);
+  S.add(rug);
+  var rug2 = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.1), mat(PAL.rugAlt));
+  rug2.rotation.x = -Math.PI / 2;
+  rug2.position.set(-2.1, 0.014, 1.1);
+  S.add(rug2);
+
+  for (var jj = 0; jj < 4; jj++) {
+    var jg2 = clayJug(0.9 + rnd() * 0.4);
+    jg2.position.set(-3.4 + jj * 0.55, 0, -2.6);
+    S.add(jg2);
+  }
+  var shelf = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.09, 0.4), mat(PAL.wood));
+  shelf.position.set(2.6, 1.5, -3.0);
+  S.add(shelf);
+
+  // oil lamps, the only light in the dark stretch
+  var lamps = [];
+  var lampPos = cfg.lamps || [[-1.9, 1.56, -2.9], [2.3, 1.6, -2.9]];
+  for (var lp = 0; lp < lampPos.length; lp++) {
+    var lm = oilLamp();
+    lm.root.position.set(lampPos[lp][0], lampPos[lp][1], lampPos[lp][2]);
+    S.add(lm.root);
+    lamps.push(lm);
+  }
+
+  S.visible = false;
+  S.userData.lamps = lamps;
+  S.userData.winLight = winLight;
+  return S;
+}
+
+// ------------------------------------------------ 8: Damascus synagogue court
+
+function buildCourtyard() {
+  var S = new THREE.Group();
+  S.add(groundPlane(120, PAL.sandLit));
+
+  // paving
+  for (var px = 0; px < 11; px++) {
+    for (var pz = 0; pz < 9; pz++) {
+      var sl = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 1.5),
+        mat((px + pz) % 2 ? PAL.sand : PAL.sandLit));
+      sl.position.set(-7.5 + px * 1.52, 0.026, 2 - pz * 1.52);
+      sl.receiveShadow = true;
+      S.add(sl);
+    }
+  }
+
+  // the synagogue front: steps, columns, architrave
+  var steps = new THREE.Group();
+  for (var sp = 0; sp < 3; sp++) {
+    var stp = new THREE.Mesh(new THREE.BoxGeometry(11 - sp * 0.7, 0.24, 3.4 - sp * 0.5),
+      mat(PAL.sandDark));
+    stp.position.set(0, 0.12 + sp * 0.24, -8.2 + sp * 0.3);
+    stp.receiveShadow = true;
+    steps.add(stp);
+  }
+  S.add(steps);
+
+  for (var c2 = 0; c2 < 6; c2++) {
+    var col = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.37, 4.3, 9),
+      mat(PAL.column));
+    col.position.set(-4.4 + c2 * 1.76, 2.87, -8.6);
+    col.castShadow = true;
+    S.add(col);
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.26, 0.88), mat(PAL.columnDark));
+    cap.position.set(-4.4 + c2 * 1.76, 5.12, -8.6);
+    S.add(cap);
+    var base = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.2, 0.86), mat(PAL.columnDark));
+    base.position.set(-4.4 + c2 * 1.76, 0.82, -8.6);
+    S.add(base);
+  }
+  var arch = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.7, 1.5), mat(PAL.sandDark));
+  arch.position.set(0, 5.6, -8.6);
+  arch.castShadow = true;
+  S.add(arch);
+  var pedi = new THREE.Mesh(new THREE.ConeGeometry(6.2, 1.5, 4, 1), mat(PAL.sand));
+  pedi.rotation.y = Math.PI / 4;
+  pedi.scale.set(1, 1, 0.22);
+  pedi.position.set(0, 6.7, -8.6);
+  S.add(pedi);
+
+  // benches for the crowd
+  for (var bn = 0; bn < 4; bn++) {
+    var bench2 = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 0.5), mat(PAL.wood));
+    bench2.position.set(bn % 2 ? 4.3 : -4.3, 0.44, -1.6 - Math.floor(bn / 2) * 1.5);
+    bench2.castShadow = true;
+    S.add(bench2);
+    for (var b2 = 0; b2 < 4; b2++) {
+      var bl2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.44, 0.1), mat(PAL.woodDark));
+      bl2.position.set((bn % 2 ? 4.3 : -4.3) + (b2 % 2 ? 1.5 : -1.5), 0.22,
+                       -1.6 - Math.floor(bn / 2) * 1.5 + (b2 < 2 ? 0.18 : -0.18));
+      S.add(bl2);
+    }
+  }
+
+  // surrounding city, so the courtyard sits inside Damascus
+  for (var bg = 0; bg < 16; bg++) {
+    var bd = building(3 + rnd() * 3, 3 + rnd() * 4, 3 + rnd() * 2.5,
+      { col: bg % 2 ? PAL.sand : PAL.sandLit, windows: 2, door: rnd() > 0.5 });
+    var ang = (bg / 16) * Math.PI * 2;
+    bd.position.set(Math.sin(ang) * (17 + rnd() * 8), 0, -4 + Math.cos(ang) * (16 + rnd() * 9));
+    bd.rotation.y = rnd() * 3;
+    S.add(bd);
+  }
+  for (var t2 = 0; t2 < 6; t2++) {
+    var ot2 = oliveTree(1.1 + rnd() * 0.5);
+    ot2.position.set((rnd() - 0.5) * 22, 0, 3 + rnd() * 6);
+    S.add(ot2);
+  }
+
+  S.visible = false;
+  return S;
+}
+
+
+// ===== lighting/moods.js =======================================
+// lighting/moods.js — the light tells the story a second time.
+//
+// Each mood is a target set, interpolated toward every frame, so light never
+// jumps on a cut. The arc: warm Jerusalem turning ominous, open noon on the
+// road, the blowout, blindness draining to nothing, three days of low lamp,
+// gold for the vision, warmth returning as sight returns, bright public day,
+// and sunrise at the end.
+//
+// Safety: every exposure change is eased over at least half a second and the
+// blowout holds rather than flickers. Nothing in this film alternates faster
+// than ~3Hz, which keeps it clear of photosensitive-trigger territory.
+
+var MOODS = {
+  // 1 - Jerusalem: warm sandstone, but the key hardens as Saul gives orders
+  jerus:     { sun: 2.5, sunCol: 0xffd9a0, amb: 0.95, ambSky: 0xb8c4d8, ambGnd: 0x8a6d4e,
+               fogN: 26, fogF: 110, fogCol: 0xd8c4a4, exp: 1.00, holy: 0, white: 0 },
+  jerusHard: { sun: 2.9, sunCol: 0xffc078, amb: 0.78, ambSky: 0x9aa2b4, ambGnd: 0x7a5a3e,
+               fogN: 22, fogF: 95,  fogCol: 0xcdb08a, exp: 0.97, holy: 0, white: 0 },
+
+  // 2 - the road at noon: flat, bright, dusty
+  road:      { sun: 3.1, sunCol: 0xfff0cc, amb: 1.05, ambSky: 0xbcd0e8, ambGnd: 0x9c7c58,
+               fogN: 40, fogF: 220, fogCol: 0xd4c0a0, exp: 1.02, holy: 0, white: 0 },
+
+  // 3 - the light. holy rises first, then the frame washes out and HOLDS.
+  holyRise:  { sun: 2.4, sunCol: 0xfff2d8, amb: 1.25, ambSky: 0xe8dcc0, ambGnd: 0xc0a480,
+               fogN: 20, fogF: 120, fogCol: 0xe8dcc0, exp: 1.22, holy: 0.55, white: 0.10 },
+  holyFull:  { sun: 1.4, sunCol: 0xffffff, amb: 1.9,  ambSky: 0xfff6e0, ambGnd: 0xe8d8b8,
+               fogN: 8,  fogF: 54,  fogCol: 0xfff6e0, exp: 1.72, holy: 1.0,  white: 0.44 },
+  holyVoice: { sun: 1.1, sunCol: 0xffffff, amb: 2.1,  ambSky: 0xfffaf0, ambGnd: 0xf0e4cc,
+               fogN: 6,  fogF: 44,  fogCol: 0xfffaf0, exp: 1.85, holy: 1.0,  white: 0.56 },
+
+  // 4 - blindness: the world drains out. 'blind' drives the subjective fade.
+  fade:      { sun: 1.6, sunCol: 0xe8e0d0, amb: 0.85, ambSky: 0x9a96a0, ambGnd: 0x6e6860,
+               fogN: 14, fogF: 70,  fogCol: 0xa8a098, exp: 0.92, holy: 0.2, white: 0 },
+  led:       { sun: 2.2, sunCol: 0xf0dcb8, amb: 0.9,  ambSky: 0xa8b0c0, ambGnd: 0x8a7458,
+               fogN: 24, fogF: 120, fogCol: 0xc4b498, exp: 0.95, holy: 0, white: 0 },
+
+  // 5 - three days: lamplight only, the room nearly dark
+  dark:      { sun: 0.12, sunCol: 0x6a7a9a, amb: 0.30, ambSky: 0x3a4258, ambGnd: 0x241c14,
+               fogN: 9,  fogF: 30,  fogCol: 0x2a2420, exp: 0.84, holy: 0, white: 0 },
+  darkNight: { sun: 0.04, sunCol: 0x4a5a80, amb: 0.20, ambSky: 0x242c42, ambGnd: 0x18120e,
+               fogN: 7,  fogF: 24,  fogCol: 0x1c1814, exp: 0.78, holy: 0, white: 0 },
+
+  // 6 - the vision: soft gold fills a dark room
+  vision:    { sun: 0.5, sunCol: 0xffd090, amb: 0.75, ambSky: 0xffdca0, ambGnd: 0x6a4e30,
+               fogN: 10, fogF: 38,  fogCol: 0x6a5436, exp: 1.06, holy: 0.42, white: 0.05 },
+
+  // 7 - sight restored: cold room warming as the scales fall
+  roomCold:  { sun: 0.7, sunCol: 0xa8b4c8, amb: 0.52, ambSky: 0x6a7490, ambGnd: 0x3a3228,
+               fogN: 11, fogF: 40,  fogCol: 0x4a4440, exp: 0.90, holy: 0, white: 0 },
+  roomWarm:  { sun: 1.9, sunCol: 0xffd9a0, amb: 0.92, ambSky: 0xd8c0a0, ambGnd: 0x7a5e40,
+               fogN: 16, fogF: 62,  fogCol: 0xc4a888, exp: 1.06, holy: 0.22, white: 0.04 },
+
+  // 8 - preaching in open daylight
+  court:     { sun: 3.2, sunCol: 0xfff2d0, amb: 1.12, ambSky: 0xc4d8f0, ambGnd: 0xa88868,
+               fogN: 44, fogF: 200, fogCol: 0xd8c8a8, exp: 1.03, holy: 0, white: 0 },
+
+  // 9 - sunrise on the road out
+  sunrise:   { sun: 2.6, sunCol: 0xffb870, amb: 1.0, ambSky: 0xf0b088, ambGnd: 0x9a7050,
+               fogN: 30, fogF: 170, fogCol: 0xe8b890, exp: 1.10, holy: 0.12, white: 0 }
+};
+
+// Build the light rig. Returns the handles the frame loop drives.
+function buildLights(scene) {
+  var amb = new THREE.HemisphereLight(0xb8c4d8, 0x8a6d4e, 0.95);
+  scene.add(amb);
+
+  var sun = new THREE.DirectionalLight(0xffd9a0, 2.5);
+  sun.position.set(-14, 22, 10);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 90;
+  sun.shadow.camera.left = -26;
+  sun.shadow.camera.right = 26;
+  sun.shadow.camera.top = 26;
+  sun.shadow.camera.bottom = -26;
+  sun.shadow.bias = -0.0012;
+  scene.add(sun);
+
+  // the holy source: a point light at the centre of the shaft, plus a
+  // downward spot that puts a hard pool on the road
+  var holy = new THREE.PointLight(0xfff6e0, 0, 60, 1.6);
+  holy.position.set(0, 7.5, -2);
+  scene.add(holy);
+
+  var holySpot = new THREE.SpotLight(0xffffff, 0, 48, 0.52, 0.42, 1.1);
+  holySpot.position.set(0, 16, -2);
+  holySpot.target.position.set(0, 0, -2);
+  scene.add(holySpot);
+  scene.add(holySpot.target);
+
+  // lamp light for the interiors
+  var lampA = new THREE.PointLight(PAL.lampGlow, 0, 9, 1.8);
+  var lampB = new THREE.PointLight(PAL.lampGlow, 0, 9, 1.8);
+  scene.add(lampA);
+  scene.add(lampB);
+
+  scene.fog = new THREE.Fog(0xd8c4a4, 26, 110);
+
+  return { amb: amb, sun: sun, holy: holy, holySpot: holySpot,
+           lampA: lampA, lampB: lampB };
+}
+
+// The volumetric shaft: nested cones of additive haze. Cheap, and it reads as
+// light with substance because each shell rotates at its own rate and the
+// whole stack breathes.
+function buildHolyShaft() {
+  var G = new THREE.Group();
+  var shells = [];
+  var specs = [
+    [0.9, 26, 0.26], [2.0, 26, 0.17], [3.4, 26, 0.10], [5.2, 26, 0.055]
+  ];
+  for (var i = 0; i < specs.length; i++) {
+    var geo = new THREE.ConeGeometry(specs[i][0], specs[i][1], 18, 1, true);
+    var m = new THREE.MeshBasicMaterial({
+      color: i < 2 ? PAL.holyWhite : PAL.holyGold,
+      transparent: true, opacity: 0, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    var sh = new THREE.Mesh(geo, m);
+    sh.position.y = specs[i][1] / 2;
+    sh.userData.base = specs[i][2];
+    sh.userData.spin = (i % 2 ? 1 : -1) * (0.05 + i * 0.03);
+    G.add(sh);
+    shells.push(sh);
+  }
+
+  // the hot core where the shaft meets the ground
+  var core = new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0,
+                                  blending: THREE.AdditiveBlending, depthWrite: false }));
+  core.position.y = 0.6;
+  G.add(core);
+
+  // ground glow where the light lands
+  var pool = new THREE.Mesh(new THREE.CircleGeometry(4.6, 24),
+    new THREE.MeshBasicMaterial({ color: PAL.holyWhite, transparent: true, opacity: 0,
+                                  blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.03;
+  G.add(pool);
+
+  G.visible = false;
+  return { root: G, shells: shells, core: core, pool: pool };
+}
+
+// Dust motes that only exist to be lit by the shaft.
+function buildMotes(count, spread, height) {
+  var geo = new THREE.BufferGeometry();
+  var pos = new Float32Array(count * 3);
+  var seed = [];
+  for (var i = 0; i < count; i++) {
+    var x = (rnd() - 0.5) * spread;
+    var y = rnd() * height;
+    var z = (rnd() - 0.5) * spread;
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    seed.push({ x: x, y: y, z: z, r: 0.2 + rnd() * 0.9, p: rnd() * 6.28 });
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xfff2d0, size: 0.055, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  }));
+  return { pts: pts, geo: geo, pos: pos, seed: seed, count: count };
+}
+
+
+// ===== cameras/shots.js ========================================
+// cameras/shots.js — the camera system.
+//
+// A shot is a position, a look-at, a focal length and a drift. Drift means no
+// shot is ever locked off: every frame adds a slow sine wander, so even a held
+// close-up breathes. Cuts blend over `blend` seconds (0 for a hard cut), eased
+// with smoothstep, which is the Bezier-feel the brief asks for without
+// needing a curve object per shot.
+//
+// A shot may also carry `path`: [p0, p1, p2] control points for a quadratic
+// Bezier the camera travels along across the beat, used for the aerial
+// descents, the follow-cam on the road and the final pull-back.
+
+var SHOTS = {
+  // ---- 1: Jerusalem ----
+  jAerial:   { pos: [0, 15.5, 16], look: [0, 1.4, -10], fov: 46, drift: [0.5, 0.2, 0.3],
+               path: [[0, 15.5, 16], [0, 8.0, 10], [0, 3.1, 5.2]], blend: 0 },
+  jStreet:   { pos: [0, 2.6, 6.4], look: [0, 1.5, -7], fov: 40, drift: [0.45, 0.16, 0.22] },
+  jTrack:    { pos: [2.1, 2.3, 3.4], look: [-0.3, 1.5, -3.5], fov: 38, drift: [0.4, 0.14, 0.2],
+               path: [[2.1, 2.3, 4.6], [1.2, 2.3, 2.0], [0.2, 2.25, -0.6]] },
+  jSaulCU:   { pos: [1.15, 1.76, 1.35], look: [-0.15, 1.68, 0.1], fov: 27, drift: [0.18, 0.08, 0.06] },
+  jFear:     { pos: [-1.6, 1.82, -2.2], look: [-0.2, 1.55, -5.0], fov: 32, drift: [0.3, 0.12, 0.1] },
+  jFearCU:   { pos: [-1.9, 1.74, -3.4], look: [-1.1, 1.66, -4.6], fov: 26, drift: [0.16, 0.08, 0.05] },
+  jWide:     { pos: [0.4, 3.5, 8.5], look: [0, 1.5, -8], fov: 44, drift: [0.55, 0.22, 0.3] },
+
+  // ---- 2: the road ----
+  rFollow:   { pos: [0.3, 2.5, 7.5], look: [0, 1.5, 0], fov: 40, drift: [0.4, 0.15, 0.2],
+               path: [[0.3, 2.5, 8.5], [0.1, 2.45, 6.4], [-0.2, 2.4, 4.6]] },
+  rSide:     { pos: [5.4, 1.9, 2.2], look: [0, 1.5, -0.4], fov: 36, drift: [0.35, 0.13, 0.16] },
+  rSaulCU:   { pos: [1.3, 1.78, 1.5], look: [-0.1, 1.7, 0.2], fov: 27, drift: [0.18, 0.08, 0.06] },
+  rCompCU:   { pos: [-1.5, 1.76, 1.3], look: [-0.1, 1.68, 0.1], fov: 28, drift: [0.18, 0.08, 0.06] },
+  rAerial:   { pos: [0, 9.0, 11], look: [0, 0.8, -26], fov: 48, drift: [0.5, 0.2, 0.28],
+               path: [[0, 5.5, 9], [0, 8.0, 13], [0, 12.5, 19]] },
+  rFeet:     { pos: [1.4, 0.45, 2.0], look: [0, 0.2, 0], fov: 34, drift: [0.2, 0.1, 0.12] },
+
+  // ---- 3: the light ----
+  lWide:     { pos: [7.0, 2.6, 6.2], look: [0, 2.2, -1.6], fov: 42, drift: [0.4, 0.16, 0.2] },
+  lOrbit:    { pos: [5.2, 2.2, 4.4], look: [0, 1.5, -1.8], fov: 36, drift: [0.3, 0.12, 0.14],
+               orbit: { c: [0, 1.5, -1.8], r: 6.4, y: 2.3, from: 0.72, to: -0.52 } },
+  lOrbitTight:{ pos: [3.0, 1.9, 2.4], look: [0, 1.35, -1.8], fov: 30, drift: [0.2, 0.1, 0.1],
+               orbit: { c: [0, 1.35, -1.8], r: 3.5, y: 1.95, from: -0.3, to: 0.62 } },
+  lFallen:   { pos: [2.1, 1.05, 1.5], look: [0, 0.5, -1.7], fov: 32, drift: [0.18, 0.09, 0.08] },
+  lFallenCU: { pos: [1.25, 0.82, 0.55], look: [0.05, 0.55, -1.5], fov: 26, drift: [0.12, 0.07, 0.05] },
+  lUp:       { pos: [0.9, 0.62, 0.6], look: [0.1, 6.5, -1.8], fov: 46, drift: [0.22, 0.1, 0.12] },
+  lBlowout:  { pos: [1.5, 1.2, 1.1], look: [0.05, 1.1, -1.7], fov: 29, drift: [0.14, 0.08, 0.06] },
+
+  // ---- 4: blindness ----
+  bSubj:     { pos: [0.55, 1.62, -1.15], look: [0.4, 1.5, -5.5], fov: 50, drift: [0.3, 0.14, 0.18] },
+  bReach:    { pos: [2.3, 1.55, 1.2], look: [0, 1.35, -1.6], fov: 32, drift: [0.22, 0.1, 0.1] },
+  bReachCU:  { pos: [1.35, 1.62, 0.5], look: [0.05, 1.5, -1.6], fov: 27, drift: [0.14, 0.08, 0.05] },
+  bHands:    { pos: [1.5, 1.15, 0.9], look: [0.1, 0.95, -1.6], fov: 30, drift: [0.18, 0.09, 0.07] },
+  bLead:     { pos: [4.4, 2.1, 4.0], look: [0, 1.4, -2.2], fov: 38, drift: [0.35, 0.14, 0.18],
+               path: [[4.4, 2.1, 4.0], [3.0, 2.2, 1.0], [1.4, 2.3, -2.4]] },
+
+  // ---- 5: three days ----
+  dRoom:     { pos: [2.4, 2.0, 3.6], look: [0.2, 1.1, -1.1], fov: 36, drift: [0.3, 0.12, 0.14],
+               path: [[2.8, 2.15, 4.2], [1.9, 1.85, 2.6], [1.1, 1.62, 1.5]] },
+  dPray:     { pos: [1.1, 1.45, 1.3], look: [0.25, 1.05, -1.0], fov: 28, drift: [0.16, 0.08, 0.06] },
+  dPrayCU:   { pos: [0.72, 1.3, 0.66], look: [0.3, 1.08, -0.9], fov: 24, drift: [0.1, 0.06, 0.04] },
+  dWindow:   { pos: [1.0, 2.1, 1.4], look: [-2.4, 2.3, -3.2], fov: 32, drift: [0.2, 0.1, 0.1] },
+
+  // ---- 6: Ananias' vision ----
+  aRoom:     { pos: [-2.2, 1.95, 3.3], look: [0.1, 1.2, -1.0], fov: 36, drift: [0.3, 0.12, 0.14] },
+  aCU:       { pos: [-1.05, 1.52, 1.25], look: [-0.1, 1.42, -0.9], fov: 27, drift: [0.15, 0.08, 0.05] },
+  aCUtight:  { pos: [-0.68, 1.46, 0.72], look: [-0.1, 1.4, -0.85], fov: 23, drift: [0.1, 0.06, 0.04] },
+  aHands:    { pos: [-0.9, 1.15, 0.95], look: [-0.15, 0.85, -0.9], fov: 29, drift: [0.16, 0.08, 0.06] },
+  aLeave:    { pos: [-2.8, 2.05, 2.6], look: [0.6, 1.4, -1.4], fov: 35, drift: [0.28, 0.12, 0.12] },
+
+  // ---- 7: sight restored ----
+  hDoor:     { pos: [1.9, 1.95, 3.2], look: [-0.9, 1.4, -0.6], fov: 36, drift: [0.28, 0.12, 0.13] },
+  hTwo:      { pos: [2.5, 1.8, 2.3], look: [-0.2, 1.35, -0.9], fov: 33, drift: [0.24, 0.11, 0.1] },
+  hSaulCU:   { pos: [1.15, 1.5, 1.05], look: [0.1, 1.38, -0.85], fov: 26, drift: [0.14, 0.07, 0.05] },
+  hAnanCU:   { pos: [-0.5, 1.52, 1.1], look: [-0.95, 1.42, -0.7], fov: 27, drift: [0.14, 0.07, 0.05] },
+  hEyes:     { pos: [0.72, 1.44, 0.52], look: [0.12, 1.4, -0.8], fov: 21, drift: [0.08, 0.05, 0.03] },
+  hHands:    { pos: [1.1, 1.72, 1.0], look: [0.05, 1.5, -0.85], fov: 28, drift: [0.14, 0.07, 0.05] },
+  hBaptism:  { pos: [2.2, 1.7, 2.6], look: [0, 1.0, -0.9], fov: 34, drift: [0.26, 0.11, 0.12] },
+
+  // ---- 8: preaching ----
+  pWide:     { pos: [0.5, 3.0, 7.6], look: [0, 1.7, -4.4], fov: 42, drift: [0.45, 0.18, 0.24] },
+  pSaul:     { pos: [0.9, 1.95, 2.4], look: [-0.15, 1.72, -1.4], fov: 32, drift: [0.22, 0.1, 0.1] },
+  pSaulCU:   { pos: [0.6, 1.82, 1.25], look: [-0.1, 1.74, -1.3], fov: 26, drift: [0.14, 0.07, 0.05] },
+  pSaulHero: { pos: [0.3, 0.95, 2.2], look: [-0.1, 1.9, -1.5], fov: 34, drift: [0.18, 0.1, 0.08] },
+  pCrowdA:   { pos: [-2.4, 1.8, 0.4], look: [-3.4, 1.62, 2.1], fov: 28, drift: [0.18, 0.09, 0.07] },
+  pCrowdB:   { pos: [2.6, 1.78, 0.6], look: [3.5, 1.6, 2.2], fov: 28, drift: [0.18, 0.09, 0.07] },
+  pOver:     { pos: [-2.0, 2.15, 3.4], look: [-0.1, 1.7, -1.5], fov: 36, drift: [0.3, 0.13, 0.14] },
+  pGrow:     { pos: [0.2, 4.2, 9.0], look: [0, 1.6, -3.6], fov: 46, drift: [0.5, 0.2, 0.26] },
+
+  // ---- 9: the road out ----
+  fRoad:     { pos: [3.2, 1.9, 4.6], look: [0, 1.4, -1.0], fov: 38, drift: [0.3, 0.13, 0.15] },
+  fPullUp:   { pos: [2.0, 2.4, 5.0], look: [0, 1.3, -6], fov: 42, drift: [0.4, 0.18, 0.2],
+               path: [[2.0, 2.4, 5.0], [1.0, 9.0, 13.0], [-0.5, 24.0, 30.0]] }
+};
+
+function smoothstep(x) {
+  x = x < 0 ? 0 : (x > 1 ? 1 : x);
+  return x * x * (3 - 2 * x);
+}
+
+// quadratic Bezier through three control points
+function bez3(p, u, out) {
+  var v = 1 - u;
+  out.set(
+    v * v * p[0][0] + 2 * v * u * p[1][0] + u * u * p[2][0],
+    v * v * p[0][1] + 2 * v * u * p[1][1] + u * u * p[2][1],
+    v * v * p[0][2] + 2 * v * u * p[1][2] + u * u * p[2][2]
+  );
+  return out;
+}
+
+
+// ===== animations/beats.js =====================================
+// animations/beats.js — the shot list.
+//
+// One entry per spoken line. `t` and `d` are written by retime.py straight
+// from aligned.json, so they are MEASURED speech onsets; everything else here
+// is direction and is preserved across retimes.
+//
+//   sc    which scene (selects the set and who is on stage)
+//   cam   a key in SHOTS
+//   mood  a key in MOODS
+//   who   which character speaks (drives the jaw envelope)
+//   act   a named action applied to the cast when the beat starts
+//
+// Scene boundaries follow storyboard.md and always fall on a line onset.
+
+var BEATS = [
+  // ---- scene 1: the persecution in Jerusalem ----
+  { t:0.00,   d:8.38,  sc:1, who:"saul",  cam:"jAerial",  mood:"jerus",     act:"s1_order" },
+  { t:8.38,   d:4.93,  sc:1, who:"chris", cam:"jFearCU",  mood:"jerus",     act:"s1_plead" },
+  { t:13.30,  d:7.58,  sc:1, who:"saul",  cam:"jSaulCU",  mood:"jerusHard", act:"s1_rage" },
+
+  // ---- scene 2: leaving for Damascus ----
+  { t:20.88,  d:2.85,  sc:2, who:"comp1", cam:"rCompCU",  mood:"road",      act:"s2_ask" },
+  { t:23.74,  d:10.52, sc:2, who:"saul",  cam:"rFollow",  mood:"road",      act:"s2_march" },
+  { t:34.26,  d:3.76,  sc:2, who:"comp1", cam:"rSide",    mood:"road",      act:"s2_bless" },
+
+  // ---- scene 3: the blinding light ----
+  { t:38.02,  d:5.29,  sc:3, who:"saul",  cam:"lWide",    mood:"holyRise",  act:"s3_shield" },
+  { t:43.31,  d:3.15,  sc:3, who:"jesus", cam:"lOrbit",   mood:"holyFull",  act:"s3_fall" },
+  { t:46.46,  d:1.12,  sc:3, who:"saul",  cam:"lFallenCU",mood:"holyFull",  act:"s3_ask" },
+  { t:47.58,  d:4.17,  sc:3, who:"jesus", cam:"lUp",      mood:"holyVoice", act:"s3_declare" },
+  { t:51.74,  d:1.94,  sc:3, who:"saul",  cam:"lBlowout", mood:"holyVoice", act:"s3_disbelief" },
+  { t:53.68,  d:4.77,  sc:3, who:"jesus", cam:"lOrbitTight",mood:"holyFull",act:"s3_command" },
+
+  // ---- scene 4: blindness ----
+  { t:58.45,  d:3.64,  sc:4, who:"saul",  cam:"bSubj",    mood:"fade",      act:"s4_blind" },
+  { t:62.09,  d:2.18,  sc:4, who:"comp1", cam:"bReach",   mood:"led",       act:"s4_concern" },
+  { t:64.27,  d:6.15,  sc:4, who:"saul",  cam:"bReachCU", mood:"led",       act:"s4_grope" },
+  { t:70.42,  d:2.47,  sc:4, who:"comp1", cam:"bLead",    mood:"led",       act:"s4_lead" },
+
+  // ---- scene 5: three days in darkness ----
+  { t:72.88,  d:9.24,  sc:5, who:"saul",  cam:"dRoom",    mood:"dark",      act:"s5_pray" },
+
+  // ---- scene 6: Ananias receives the vision ----
+  { t:82.13,  d:1.11,  sc:6, who:"jesus", cam:"aCU",      mood:"vision",    act:"s6_called" },
+  { t:83.24,  d:0.91,  sc:6, who:"anan",  cam:"aCUtight", mood:"vision",    act:"s6_answer" },
+  { t:84.15,  d:6.56,  sc:6, who:"jesus", cam:"aRoom",    mood:"vision",    act:"s6_instruct" },
+  { t:90.71,  d:7.75,  sc:6, who:"anan",  cam:"aCU",      mood:"vision",    act:"s6_protest" },
+  { t:98.46,  d:7.83,  sc:6, who:"jesus", cam:"aHands",   mood:"vision",    act:"s6_chosen" },
+  { t:106.29, d:2.46,  sc:6, who:"anan",  cam:"aLeave",   mood:"vision",    act:"s6_obey" },
+
+  // ---- scene 7: sight restored, and baptism ----
+  { t:108.75, d:1.35,  sc:7, who:"anan",  cam:"hDoor",    mood:"roomCold",  act:"s7_enter" },
+  { t:110.10, d:1.66,  sc:7, who:"saul",  cam:"hSaulCU",  mood:"roomCold",  act:"s7_who" },
+  { t:111.76, d:12.50, sc:7, who:"anan",  cam:"hTwo",     mood:"roomCold",  act:"s7_explain" },
+  { t:124.26, d:3.29,  sc:7, who:"saul",  cam:"hSaulCU",  mood:"roomCold",  act:"s7_evenme" },
+  { t:127.55, d:2.13,  sc:7, who:"anan",  cam:"hHands",   mood:"roomWarm",  act:"s7_layhands" },
+  { t:129.68, d:5.35,  sc:7, who:"saul",  cam:"hEyes",    mood:"roomWarm",  act:"s7_see" },
+  { t:135.03, d:2.65,  sc:7, who:"anan",  cam:"hBaptism", mood:"roomWarm",  act:"s7_baptize" },
+  { t:137.68, d:6.07,  sc:7, who:"saul",  cam:"hTwo",     mood:"roomWarm",  act:"s7_reflect" },
+  { t:143.75, d:2.07,  sc:7, who:"anan",  cam:"hAnanCU",  mood:"roomWarm",  act:"s7_whatnow" },
+
+  // ---- scene 8: preaching in Damascus ----
+  { t:145.82, d:5.28,  sc:8, who:"saul",  cam:"pSaul",    mood:"court",     act:"s8_declare" },
+  { t:151.10, d:3.96,  sc:8, who:"citA",  cam:"pCrowdA",  mood:"court",     act:"s8_recognise" },
+  { t:155.06, d:6.57,  sc:8, who:"citB",  cam:"pCrowdB",  mood:"court",     act:"s8_accuse" },
+  { t:161.64, d:13.80, sc:8, who:"saul",  cam:"pSaulCU",  mood:"court",     act:"s8_testify" },
+  { t:175.44, d:1.34,  sc:8, who:"citA",  cam:"pOver",    mood:"court",     act:"s8_andnow" },
+  { t:176.78, d:7.06,  sc:8, who:"saul",  cam:"pSaulHero",mood:"court",     act:"s8_proclaim" },
+  { t:183.84, d:2.78,  sc:8, who:"citB",  cam:"pCrowdB",  mood:"court",     act:"s8_evenafter" },
+  { t:186.62, d:6.03,  sc:8, who:"saul",  cam:"pGrow",    mood:"court",     act:"s8_mercy" },
+
+  // ---- scene 9: the road out ----
+  { t:192.64, d:6.33,  sc:9, who:"narr",  cam:"fPullUp",  mood:"sunrise",   act:"s9_walk" }
+];
+
+// Mid-beat camera changes: scene 8's long testimony (13.8s) and scene 3's
+// orbit need to move inside a single line, which the brief asks for. Each
+// entry re-aims the camera at an absolute time without touching the beat.
+var SUBCUTS = [
+  { t:40.60,  cam:"lOrbit"     },  // the light rises: start the orbit early
+  { t:55.90,  cam:"lFallen"    },  // back out to see him on the ground
+  { t:60.90,  cam:"bHands"     },  // his hands, searching
+  { t:76.40,  cam:"dPray"      },  // push in on the praying figure
+  { t:79.60,  cam:"dPrayCU"    },
+  { t:87.20,  cam:"aCU"        },
+  { t:94.60,  cam:"aCUtight"   },  // the protest, close
+  { t:102.10, cam:"aCU"        },
+  { t:116.40, cam:"hAnanCU"    },  // Ananias explaining, close
+  { t:120.60, cam:"hSaulCU"    },  // Saul listening to it
+  { t:131.90, cam:"hTwo"       },  // he sees the man in front of him
+  { t:140.20, cam:"hSaulCU"    },
+  { t:165.30, cam:"pOver"      },  // the testimony, from the crowd
+  { t:168.90, cam:"pCrowdA"    },  // a face in that crowd
+  { t:171.40, cam:"pSaulCU"    },
+  { t:179.80, cam:"pWide"      },  // the audience has grown
+  { t:189.40, cam:"pSaulHero"  },
+  { t:195.80, cam:"fRoad"      }   // last look at him on the road
+];
+
+
+// ===== characters/cast.js ======================================
+// characters/cast.js — who is in the film, and where they stand in each scene.
+//
+// Saul is built once and reused across every scene, so his identity cannot
+// drift. His robe swaps colour at the baptism (dark -> pale) because that is
+// the one costume change the story actually makes; nothing else about him
+// changes.
+//
+// Crowds are built from the same rig with varied height, build, skin, robe and
+// headwear, and each extra carries its own idle phase so a crowd never moves
+// as one body.
+
+function buildCast() {
+  var C = {};
+
+  // ---- principals ----
+  C.saul = buildPerson({
+    skin: PAL.skinS, robe: PAL.robeSaulDark, under: 0x2f2a33,
+    hair: PAL.hairDark, beard: true, belt: true, mantle: 0x332c38,
+    height: 1.02, eye: 0x3a2a1e
+  });
+  C.anan = buildPerson({
+    skin: PAL.skinA, robe: PAL.robeAnanias, under: 0x8e8775,
+    hair: PAL.hairGrey, beard: true, beardColor: PAL.hairGrey,
+    headwrap: 0x9a9281, height: 0.99, build: 1.04, eye: 0x3b2d22
+  });
+  C.comp1 = buildPerson({
+    skin: PAL.skinD, robe: PAL.robeCrowdB, hair: PAL.hairMid, beard: true,
+    headwrap: 0x6d6456, belt: true, height: 1.0
+  });
+  C.comp2 = buildPerson({
+    skin: PAL.skinC, robe: PAL.robeCrowdD, hair: PAL.hairDark,
+    headwrap: 0x7a6e5e, belt: true, height: 0.97, build: 1.06
+  });
+  C.chris = buildPerson({
+    skin: PAL.skinC, robe: PAL.robeCrowdC, hair: PAL.hairMid, beard: true,
+    height: 0.98
+  });
+  C.citA = buildPerson({
+    skin: PAL.skinA, robe: PAL.robeCrowdA, hair: PAL.hairMid, beard: true,
+    headwrap: 0x857a63, height: 1.0, build: 1.05
+  });
+  C.citB = buildPerson({
+    skin: PAL.skinD, robe: PAL.robeCrowdE, hair: PAL.hairGrey, beard: true,
+    beardColor: PAL.hairGrey, height: 0.96, build: 1.02
+  });
+
+  // ---- extras ----
+  // Two guards for Jerusalem, a family being arrested, a crowd for Damascus.
+  C.guards = [];
+  for (var g = 0; g < 2; g++) {
+    C.guards.push(buildPerson({
+      skin: g ? PAL.skinD : PAL.skinA, robe: 0x5e5a52, under: 0x4a463e,
+      hair: PAL.hairDark, helmet: true, belt: true,
+      height: 1.03 + g * 0.02, build: 1.08
+    }));
+  }
+
+  C.persecuted = [];
+  var pcfg = [
+    { skin: PAL.skinC, robe: PAL.robeCrowdC, h: 0.99, hair: PAL.hairMid, beard: true },
+    { skin: PAL.skinA, robe: PAL.robeCrowdA, h: 0.94, hair: PAL.hairDark, wrap: 0x8d7f6a },
+    { skin: PAL.skinD, robe: PAL.robeCrowdD, h: 0.79, hair: PAL.hairDark },   // a child
+    { skin: PAL.skinS, robe: PAL.robeCrowdB, h: 0.97, hair: PAL.hairGrey, beard: true },
+    { skin: PAL.skinC, robe: PAL.robeCrowdE, h: 0.92, hair: PAL.hairMid, wrap: 0x9c8d72 }
+  ];
+  for (var p = 0; p < pcfg.length; p++) {
+    var pc = pcfg[p];
+    C.persecuted.push(buildPerson({
+      skin: pc.skin, robe: pc.robe, hair: pc.hair, beard: !!pc.beard,
+      headwrap: pc.wrap || null, height: pc.h, build: 0.98 + (p % 3) * 0.04
+    }));
+  }
+
+  C.crowd = [];
+  var robes = [PAL.robeCrowdA, PAL.robeCrowdB, PAL.robeCrowdC, PAL.robeCrowdD, PAL.robeCrowdE];
+  var skins = [PAL.skinS, PAL.skinA, PAL.skinC, PAL.skinD];
+  var hairs = [PAL.hairDark, PAL.hairMid, PAL.hairGrey];
+  for (var i = 0; i < 14; i++) {
+    C.crowd.push(buildPerson({
+      skin: skins[i % 4], robe: robes[i % 5], hair: hairs[i % 3],
+      beard: i % 3 !== 1, headwrap: i % 4 === 0 ? robes[(i + 2) % 5] : null,
+      height: 0.90 + (i % 5) * 0.035, build: 0.96 + (i % 4) * 0.045
+    }));
+  }
+
+  return C;
+}
+
+// Flatten the cast to a list, for the per-frame animation pass.
+function castList(C) {
+  var all = [C.saul, C.anan, C.comp1, C.comp2, C.chris, C.citA, C.citB];
+  return all.concat(C.guards, C.persecuted, C.crowd);
+}
+
+function hideAll(C) {
+  var l = castList(C);
+  for (var i = 0; i < l.length; i++) l[i].root.visible = false;
+}
+
+function place(c, x, z, ry) {
+  c.root.visible = true;
+  c.root.position.x = x;
+  c.root.position.z = z;
+  c.root.rotation.y = ry === undefined ? 0 : ry;
+}
+
+// Reset the voluntary pose targets. Involuntary state (breath/blink phase) is
+// deliberately left alone so nobody resyncs on a scene change.
+function clearPose(c) {
+  var s = c.s;
+  s.lean = 0; s.slump = 0; s.headDown = 0; s.headTurn = 0; s.headTilt = 0;
+  s.browAngle = 0; s.browRaise = 0; s.lidDrop = 0;
+  s.armUpL = 0; s.armUpR = 0; s.reach = 0; s.point = 0; s.shield = 0;
+  s.kneel = 0; s.fallen = 0; s.walk = 0;
+}
+
+// -------------------------------------------------------------- staging
+// Each scene places only the characters it needs and hides the rest, which is
+// also what keeps the draw call count down.
+
+function stageScene(n, C, SETS) {
+  hideAll(C);
+  for (var k in SETS) if (SETS[k]) SETS[k].visible = false;
+  var l = castList(C);
+  for (var i = 0; i < l.length; i++) clearPose(l[i]);
+
+  if (n === 1) {
+    SETS.jerus.visible = true;
+    place(C.saul, 0.2, 1.2, Math.PI);          // facing away, down the street
+    place(C.guards[0], -1.3, 1.9, Math.PI);
+    place(C.guards[1], 1.6, 2.1, Math.PI);
+    place(C.chris, -1.1, -4.6, 0);
+    place(C.persecuted[0], 0.3, -5.4, 0.2);
+    place(C.persecuted[1], -2.2, -5.9, -0.3);
+    place(C.persecuted[2], -1.5, -4.0, 0.1);   // the child, close to the adults
+    place(C.persecuted[3], 1.7, -6.3, -0.2);
+    place(C.persecuted[4], 2.4, -4.9, 0.4);
+    return;
+  }
+
+  if (n === 2 || n === 3 || n === 4) {
+    SETS.road.visible = true;
+    // Saul on the road, companions flanking and slightly behind
+    place(C.saul, 0, -1.8, Math.PI);
+    place(C.comp1, -1.6, -0.5, Math.PI);
+    place(C.comp2, 1.7, -0.2, Math.PI);
+    if (n === 2) {
+      C.saul.s.walk = 1; C.comp1.s.walk = 1; C.comp2.s.walk = 1;
+    }
+    return;
+  }
+
+  if (n === 5) {
+    SETS.house.visible = true;
+    place(C.saul, 0.3, -0.9, 0.25);
+    C.saul.s.kneel = 1;
+    C.saul.s.headDown = 0.85;
+    C.saul.s.lidDrop = 1;
+    C.saul.s.armUpL = 0.3; C.saul.s.armUpR = 0.3;
+    return;
+  }
+
+  if (n === 6) {
+    SETS.ananHouse.visible = true;
+    place(C.anan, -0.1, -0.85, 0.1);
+    C.anan.s.kneel = 1;
+    C.anan.s.armUpL = 0.45; C.anan.s.armUpR = 0.45;
+    return;
+  }
+
+  if (n === 7) {
+    SETS.house.visible = true;
+    place(C.saul, 0.35, -0.85, 0.3);
+    C.saul.s.kneel = 1;
+    C.saul.s.lidDrop = 1;
+    C.saul.s.headDown = 0.4;
+    place(C.anan, -1.5, -0.2, 1.1);
+    return;
+  }
+
+  if (n === 8) {
+    SETS.court.visible = true;
+    place(C.saul, -0.15, -2.2, 0);              // on the steps, facing the crowd
+    C.saul.root.position.y = 0.72;
+    place(C.citA, -3.4, 2.0, -0.5);
+    place(C.citB, 3.5, 2.1, 0.5);
+    // the crowd in a loose arc, nobody on a grid
+    var arc = [
+      [-5.0, 3.4, -0.4], [-3.0, 4.1, -0.2], [-1.2, 3.0, 0.05], [0.6, 3.8, 0.0],
+      [2.4, 3.1, 0.15], [4.6, 3.9, 0.35], [-4.2, 5.6, -0.3], [-1.9, 6.0, -0.1],
+      [0.3, 5.4, 0.0], [2.8, 5.9, 0.2], [5.2, 5.5, 0.3], [-6.1, 4.8, -0.45],
+      [6.3, 4.4, 0.45], [1.5, 7.2, 0.05]
+    ];
+    for (var ci = 0; ci < C.crowd.length; ci++) {
+      place(C.crowd[ci], arc[ci][0], arc[ci][1], arc[ci][2] + Math.PI);
+      C.crowd[ci].s.headTurn = (rnd() - 0.5) * 0.3;
+    }
+    return;
+  }
+
+  if (n === 9) {
+    SETS.road.visible = true;
+    place(C.saul, 0, 0.5, Math.PI);
+    C.saul.s.walk = 1;
+    return;
+  }
+}
+
+
+// ===== animations/acts.js ======================================
+// animations/acts.js — one function per beat.
+//
+// An act only sets TARGETS; perform.js eases bodies toward them. That means a
+// cut never catches a snapped pose, and an act can be re-applied on a seek
+// without the frame looking different from a continuous play.
+//
+// Listeners get reactions too. A two-hander where only the speaker moves
+// reads as two robots taking turns, so each act also says what the other
+// people in frame are doing.
+
+function buildActs(film) {
+  function face(c, other) {
+    // turn one figure's head toward another, in that figure's local frame
+    if (!c || !other) return;
+    var dx = other.root.position.x - c.root.position.x;
+    var dz = other.root.position.z - c.root.position.z;
+    var want = Math.atan2(dx, dz) - c.root.rotation.y;
+    while (want > Math.PI) want -= Math.PI * 2;
+    while (want < -Math.PI) want += Math.PI * 2;
+    c.s.headTurn = Math.max(-1, Math.min(1, want / 0.5));
+  }
+
+  var A = {};
+
+  // ---------------------------------------------------- 1: persecution
+  A.s1_order = function (C) {
+    var s = C.saul.s;
+    s.point = 1; s.browAngle = 1; s.lean = 0.3; s.walk = 0.45;
+    for (var g = 0; g < C.guards.length; g++) C.guards[g].s.walk = 0.45;
+    for (var p = 0; p < C.persecuted.length; p++) {
+      C.persecuted[p].s.browRaise = 0.8;
+      C.persecuted[p].s.headTurn = 0.3;
+    }
+    C.chris.s.browRaise = 1;
+  };
+  A.s1_plead = function (C) {
+    C.saul.s.point = 0.5; C.saul.s.walk = 0; C.saul.s.browAngle = 0.9;
+    var c = C.chris.s;
+    c.armUpL = 0.75; c.armUpR = 0.75; c.browRaise = 1; c.lean = 0.2;
+    face(C.chris, C.saul);
+    for (var p = 0; p < C.persecuted.length; p++) {
+      C.persecuted[p].s.browRaise = 0.9;
+      C.persecuted[p].s.slump = 0.3;
+    }
+  };
+  A.s1_rage = function (C) {
+    var s = C.saul.s;
+    s.browAngle = 1; s.point = 1; s.lean = 0.45; s.headTurn = 0;
+    C.chris.s.slump = 0.6; C.chris.s.headDown = 0.5;
+    C.chris.s.armUpL = 0.2; C.chris.s.armUpR = 0.2;
+    for (var g = 0; g < C.guards.length; g++) C.guards[g].s.lean = 0.15;
+  };
+
+  // ------------------------------------------------------ 2: the road
+  A.s2_ask = function (C) {
+    C.comp1.s.headTurn = 0; C.comp1.s.browRaise = 0.4;
+    face(C.comp1, C.saul);
+    C.saul.s.walk = 1; C.comp1.s.walk = 1; C.comp2.s.walk = 1;
+  };
+  A.s2_march = function (C) {
+    var s = C.saul.s;
+    s.walk = 1; s.lean = 0.12; s.browAngle = 0.55; s.point = 0.3;
+    C.comp1.s.walk = 1; C.comp2.s.walk = 1;
+    face(C.comp1, C.saul);
+  };
+  A.s2_bless = function (C) {
+    C.comp1.s.armUpR = 0.4; C.comp1.s.browRaise = 0.25;
+    C.saul.s.point = 0; C.saul.s.walk = 1;
+    C.comp1.s.walk = 1; C.comp2.s.walk = 1;
+  };
+
+  // --------------------------------------------------- 3: the light
+  A.s3_shield = function (C) {
+    var s = C.saul.s;
+    s.walk = 0; s.shield = 1; s.browRaise = 1; s.headDown = -0.3;
+    s.headTilt = 0.3; s.lean = -0.25;
+    C.comp1.s.walk = 0; C.comp2.s.walk = 0;
+    C.comp1.s.shield = 0.7; C.comp2.s.shield = 0.6;
+    C.comp1.s.browRaise = 1; C.comp2.s.browRaise = 1;
+  };
+  A.s3_fall = function (C) {
+    var s = C.saul.s;
+    s.fallen = 1; s.shield = 0.8; s.kneel = 0.6; s.headDown = 0.3;
+    s.browRaise = 1;
+    C.comp1.s.shield = 0.9; C.comp2.s.shield = 0.85;
+    C.comp1.s.kneel = 0.4; C.comp2.s.kneel = 0.35;
+  };
+  A.s3_ask = function (C) {
+    var s = C.saul.s;
+    s.fallen = 1; s.shield = 0.45; s.headDown = -0.5; s.browRaise = 1;
+    s.armUpR = 0.3;
+  };
+  A.s3_declare = function (C) {
+    var s = C.saul.s;
+    s.fallen = 1; s.shield = 0.95; s.headDown = 0.2; s.browRaise = 1;
+    C.comp1.s.shield = 1; C.comp2.s.shield = 0.95;
+  };
+  A.s3_disbelief = function (C) {
+    var s = C.saul.s;
+    s.fallen = 1; s.shield = 0.3; s.headDown = -0.4; s.browRaise = 1;
+    s.headTilt = -0.2;
+  };
+  A.s3_command = function (C) {
+    var s = C.saul.s;
+    s.fallen = 1; s.shield = 0.6; s.headDown = 0.55; s.browRaise = 0.8;
+    s.kneel = 0.8;
+  };
+
+  // ------------------------------------------------- 4: blindness
+  A.s4_blind = function (C, b) {
+    var s = C.saul.s;
+    s.fallen = 0.35; s.shield = 0; s.kneel = 0.25; s.lidDrop = 1;
+    s.browRaise = 0.9; s.reach = 0.55; s.headTurn = 0.2;
+    film.setBlind(1);                    // subjective fade to black
+    C.comp1.s.kneel = 0; C.comp2.s.kneel = 0;
+    C.comp1.s.browRaise = 0.6;
+  };
+  A.s4_concern = function (C) {
+    film.setBlind(0);                    // back to an external camera
+    C.saul.s.reach = 0.8; C.saul.s.lidDrop = 1; C.saul.s.kneel = 0.15;
+    C.comp1.s.lean = 0.3; C.comp1.s.reach = 0.4; C.comp1.s.browRaise = 0.7;
+    face(C.comp1, C.saul);
+  };
+  A.s4_grope = function (C) {
+    var s = C.saul.s;
+    s.reach = 1; s.lidDrop = 1; s.kneel = 0; s.headDown = 0.25;
+    s.headTurn = -0.3; s.browRaise = 0.8;
+    C.comp1.s.reach = 0.65; C.comp2.s.reach = 0.5;
+    C.comp1.s.lean = 0.25;
+  };
+  A.s4_lead = function (C) {
+    var s = C.saul.s;
+    s.reach = 0.5; s.lidDrop = 1; s.headDown = 0.4; s.walk = 0.55;
+    C.comp1.s.walk = 0.55; C.comp2.s.walk = 0.55;
+    C.comp1.s.armUpR = 0.35; C.comp2.s.armUpL = 0.3;
+  };
+
+  // --------------------------------------------- 5: three days dark
+  A.s5_pray = function (C) {
+    var s = C.saul.s;
+    s.kneel = 1; s.headDown = 0.9; s.lidDrop = 1; s.slump = 0.5;
+    s.armUpL = 0.35; s.armUpR = 0.35; s.walk = 0;
+  };
+
+  // ------------------------------------------------- 6: the vision
+  A.s6_called = function (C) {
+    var s = C.anan.s;
+    s.kneel = 1; s.headDown = -0.3; s.browRaise = 1; s.armUpL = 0.5; s.armUpR = 0.5;
+  };
+  A.s6_answer = function (C) {
+    C.anan.s.headDown = -0.45; C.anan.s.browRaise = 0.9;
+  };
+  A.s6_instruct = function (C) {
+    C.anan.s.headDown = -0.2; C.anan.s.browRaise = 0.6; C.anan.s.lidDrop = 0.2;
+  };
+  A.s6_protest = function (C) {
+    var s = C.anan.s;
+    s.browRaise = 1; s.headDown = 0.1; s.armUpR = 0.8; s.lean = 0.25;
+    s.headTilt = 0.15;
+  };
+  A.s6_chosen = function (C) {
+    var s = C.anan.s;
+    s.browRaise = 0.4; s.headDown = 0.5; s.armUpL = 0.4; s.armUpR = 0.4;
+    s.lean = -0.1;
+  };
+  A.s6_obey = function (C) {
+    var s = C.anan.s;
+    s.kneel = 0; s.headDown = 0.2; s.browRaise = 0.2; s.armUpL = 0; s.armUpR = 0;
+  };
+
+  // --------------------------------------- 7: sight restored, baptism
+  A.s7_enter = function (C) {
+    C.anan.s.walk = 0.5; C.anan.s.browRaise = 0.5;
+    C.saul.s.kneel = 1; C.saul.s.lidDrop = 1; C.saul.s.headDown = 0.45;
+  };
+  A.s7_who = function (C) {
+    C.anan.s.walk = 0;
+    var s = C.saul.s;
+    s.headDown = 0; s.headTurn = -0.5; s.lidDrop = 1; s.browRaise = 0.7;
+    s.reach = 0.3;
+  };
+  A.s7_explain = function (C) {
+    C.anan.s.lean = 0.2; C.anan.s.armUpR = 0.3;
+    face(C.anan, C.saul);
+    C.saul.s.headTurn = -0.35; C.saul.s.lidDrop = 1; C.saul.s.browRaise = 0.5;
+  };
+  A.s7_evenme = function (C) {
+    var s = C.saul.s;
+    s.headDown = 0.35; s.slump = 0.45; s.lidDrop = 1; s.browRaise = 0.3;
+    s.browAngle = -0.3;
+    C.anan.s.lean = 0.15; C.anan.s.browRaise = 0.3;
+  };
+  A.s7_layhands = function (C, b) {
+    C.anan.s.kneel = 0.75; C.anan.s.reach = 1; C.anan.s.lean = 0.3;
+    C.saul.s.headDown = 0.1; C.saul.s.lidDrop = 1;
+    film.dropScales(b.t + 1.1);          // the scales fall as he speaks
+  };
+  A.s7_see = function (C) {
+    var s = C.saul.s;
+    s.lidDrop = 0; s.browRaise = 1; s.headDown = -0.25; s.kneel = 0.6;
+    s.armUpL = 0.4; s.armUpR = 0.4; s.reach = 0;
+    C.anan.s.reach = 0.3; C.anan.s.browRaise = 0.5; C.anan.s.kneel = 0.6;
+  };
+  A.s7_baptize = function (C) {
+    C.saul.s.kneel = 0.4; C.saul.s.headDown = 0.3; C.saul.s.lidDrop = 0;
+    C.anan.s.armUpR = 0.9; C.anan.s.kneel = 0.4; C.anan.s.reach = 0.4;
+    // the one costume change in the film: the dark robe becomes pale
+    C.saul.robe.material.color.setHex(PAL.robeSaulLight);
+  };
+  A.s7_reflect = function (C) {
+    var s = C.saul.s;
+    s.kneel = 0; s.headDown = 0.2; s.slump = 0.2; s.lidDrop = 0;
+    s.browAngle = -0.2; s.armUpL = 0; s.armUpR = 0;
+    C.anan.s.kneel = 0; C.anan.s.reach = 0; C.anan.s.armUpR = 0;
+    face(C.anan, C.saul);
+  };
+  A.s7_whatnow = function (C) {
+    C.anan.s.browRaise = 0.5; C.anan.s.lean = 0.15;
+    C.saul.s.headTurn = -0.3;
+  };
+
+  // ----------------------------------------------- 8: preaching
+  A.s8_declare = function (C) {
+    var s = C.saul.s;
+    s.point = 0.8; s.lean = 0.2; s.browRaise = 0.6; s.headDown = -0.15;
+    s.armUpR = 0.5; s.lidDrop = 0; s.kneel = 0; s.slump = 0;
+    for (var i = 0; i < C.crowd.length; i++) C.crowd[i].s.headTurn = (rnd() - 0.5) * 0.2;
+  };
+  A.s8_recognise = function (C) {
+    C.saul.s.point = 0.3;
+    C.citA.s.lean = 0.25; C.citA.s.browRaise = 0.9; C.citA.s.point = 0.5;
+    face(C.citA, C.citB);
+    for (var i = 0; i < C.crowd.length; i++) {
+      C.crowd[i].s.headTurn = (rnd() - 0.5) * 0.6;
+      C.crowd[i].s.browRaise = 0.4;
+    }
+  };
+  A.s8_accuse = function (C) {
+    C.citB.s.point = 0.8; C.citB.s.browAngle = 0.6; C.citB.s.lean = 0.3;
+    C.citA.s.point = 0.2; C.citA.s.headTurn = 0.3;
+    C.saul.s.headDown = 0.1; C.saul.s.point = 0;
+  };
+  A.s8_testify = function (C) {
+    var s = C.saul.s;
+    s.point = 0.6; s.lean = 0.25; s.browRaise = 0.5; s.armUpR = 0.6;
+    C.citB.s.point = 0; C.citB.s.browAngle = 0.2;
+    C.citA.s.point = 0;
+    for (var i = 0; i < C.crowd.length; i++) {
+      C.crowd[i].s.headTurn = (rnd() - 0.5) * 0.15;
+      C.crowd[i].s.browRaise = 0.2;
+    }
+  };
+  A.s8_andnow = function (C) {
+    C.citA.s.browRaise = 0.8; C.citA.s.lean = 0.2;
+    C.saul.s.point = 0.3;
+  };
+  A.s8_proclaim = function (C) {
+    var s = C.saul.s;
+    s.point = 1; s.armUpR = 0.9; s.lean = 0.15; s.browRaise = 0.8;
+    s.headDown = -0.3;
+    for (var i = 0; i < C.crowd.length; i++) C.crowd[i].s.browRaise = 0.5;
+  };
+  A.s8_evenafter = function (C) {
+    C.citB.s.browRaise = 0.7; C.citB.s.lean = 0.2; C.citB.s.point = 0.3;
+    C.saul.s.point = 0.2; C.saul.s.armUpR = 0.2;
+  };
+  A.s8_mercy = function (C) {
+    var s = C.saul.s;
+    s.point = 0.2; s.armUpL = 0.45; s.armUpR = 0.45; s.lean = 0;
+    s.browRaise = 0.3; s.headDown = 0;
+    C.citB.s.point = 0; C.citB.s.browAngle = 0; C.citB.s.headDown = 0.2;
+    C.citA.s.headDown = 0.15;
+  };
+
+  // --------------------------------------------- 9: the road out
+  A.s9_walk = function (C) {
+    var s = C.saul.s;
+    s.walk = 1; s.lean = 0.06; s.headDown = 0; s.browRaise = 0.2;
+    s.point = 0; s.armUpL = 0; s.armUpR = 0; s.lidDrop = 0;
+  };
+
+  return A;
+}
+
+
+// ===== scripts/transport.js ====================================
+// scripts/transport.js — the clock, the beat dispatcher, and the frame loop.
+//
+// In playback the <audio> element IS the clock: every frame reads
+// voice.currentTime, so picture cannot drift from sound no matter how the
+// browser schedules frames. In render mode time is supplied in exact 1/30s
+// steps instead, which makes the render deterministic and resumable.
+//
+// Beats are dispatched by onset, not by accumulation. Because each beat's `t`
+// came from a measured speech onset, a cut can never land before its line is
+// spoken.
+
+var FPS = 30;
+
+function makeTransport(opts) {
+  var beats = opts.beats;
+  var duration = opts.duration;
+  var applyBeat = opts.applyBeat;
+  var frame = opts.frame;
+  var voice = opts.voice;
+  var renderMode = opts.renderMode;
+
+  var time = 0;
+  var playing = false;
+  var beatIdx = -1;
+  var last = 0;
+
+  // Find the beat that owns time t. Linear from the current index in playback
+  // (cheap), binary search on seek (correct after a jump).
+  function beatAt(t) {
+    var lo = 0, hi = beats.length - 1, best = 0;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (beats[mid].t <= t) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    return best;
+  }
+
+  function sync(t) {
+    var want = beatAt(t);
+    if (want !== beatIdx) {
+      // When seeking forward over several beats, apply them in order so any
+      // state they set (a character's pose, which set is visible) ends up
+      // where it would have been had the film played through.
+      var from = want < beatIdx ? 0 : beatIdx + 1;
+      for (var i = from; i <= want; i++) applyBeat(beats[i], i, t);
+      beatIdx = want;
+    }
+  }
+
+  function step(t, dt) {
+    time = t;
+    sync(t);
+    frame(t, dt);
+  }
+
+  // ---- playback ----
+  function loop() {
+    if (!playing) return;
+    var t = voice.currentTime;
+    var dt = Math.min(0.1, Math.max(0.0005, t - last));
+    last = t;
+    step(t, dt);
+    if (t < duration) {
+      requestAnimationFrame(loop);
+    } else {
+      playing = false;
+    }
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    last = voice.currentTime;
+    voice.play();
+    requestAnimationFrame(loop);
+  }
+
+  function reset() {
+    time = 0;
+    beatIdx = -1;
+    last = 0;
+    applyBeat(beats[0], 0, 0);
+    beatIdx = 0;
+    step(0, 1 / FPS);
+  }
+
+  // ---- render mode ----
+  // Advance in exact frame steps from wherever we are to the requested time,
+  // so eased values (which integrate dt) land identically on every pass. A
+  // shard that starts at frame 2000 must produce the same pixels as a full
+  // run, so seekTo walks the easing forward rather than teleporting.
+  function seekTo(t) {
+    var steps = Math.round(t * FPS);
+    for (var i = 0; i <= steps; i++) step(i / FPS, 1 / FPS);
+  }
+
+  function advanceTo(t) {
+    var target = Math.round(t * FPS);
+    var cur = Math.round(time * FPS);
+    if (target < cur) { reset(); cur = 0; }
+    for (var f = cur + 1; f <= target; f++) step(f / FPS, 1 / FPS);
+    if (target === 0) step(0, 1 / FPS);
+  }
+
+  return {
+    play: play, reset: reset, seekTo: seekTo, advanceTo: advanceTo,
+    step: step, duration: duration,
+    get time() { return time; },
+    get beatIdx() { return beatIdx; }
+  };
+}
+
+
+// ===== scripts/frame.js ========================================
+// scripts/frame.js — one frame of the film.
+//
+// Order matters: actions set pose targets, the performance pass eases bodies
+// toward them, the camera is solved from the current shot, then light and
+// effects are interpolated and drawn. Everything here is a pure function of
+// (t, dt) given the beat state, which is what makes the render deterministic.
+
+function makeFilm(ctx) {
+  var scene = ctx.scene, camera = ctx.camera, renderer = ctx.renderer;
+  var C = ctx.cast, SETS = ctx.sets, L = ctx.lights;
+  var shaft = ctx.shaft, motes = ctx.motes, dustRoad = ctx.dustRoad;
+
+  var curScene = 0;
+  var curShot = SHOTS.jAerial, prevShot = SHOTS.jAerial;
+  var shotT = 1, shotStart = 0, beatStart = 0, beatDur = 1;
+  var mood = {}, targetMood = MOODS.jerus;
+  for (var k in MOODS.jerus) mood[k] = MOODS.jerus[k];
+
+  var speaker = null, speakStart = 0, speakDur = 0;
+  var blind = 0, blindTarget = 0;        // subjective blindness fade
+  var scales = 0;                        // the scales-falling particles
+  var subIdx = -1;
+
+  var vTmp = new THREE.Vector3(), vLook = new THREE.Vector3();
+
+  // ----------------------------------------------------------- the beat
+  function applyBeat(b, i, t) {
+    if (b.sc !== curScene) {
+      stageScene(b.sc, C, SETS);
+      curScene = b.sc;
+    }
+    cutTo(SHOTS[b.cam], b.t, b.d, b.cam === "jAerial" ? 0 : 0.5);
+    targetMood = MOODS[b.mood];
+    speaker = C[b.who] || null;
+    speakStart = b.t;
+    speakDur = b.d;
+    beatStart = b.t;
+    beatDur = b.d;
+    // read ctx.acts live: buildActs needs the film object, so the acts are
+    // attached to ctx after makeFilm returns. Snapshotting it here would
+    // capture null and every beat would be a no-op.
+    var acts = ctx.acts;
+    if (acts && acts[b.act]) acts[b.act](C, b, ctx);
+    // reset the subcut cursor so a seek re-arms the right one
+    subIdx = -1;
+    for (var s = 0; s < SUBCUTS.length; s++) if (SUBCUTS[s].t <= t) subIdx = s;
+  }
+
+  function cutTo(shot, at, dur, blend) {
+    if (!shot || shot === curShot) return;
+    prevShot = sampleShot(curShot, at);
+    curShot = shot;
+    shotStart = at;
+    shotT = (blend === undefined ? 0.5 : blend) <= 0 ? 1 : 0;
+    curShot._blend = blend === undefined ? 0.5 : blend;
+    curShot._in = at;
+    curShot._dur = dur;
+  }
+
+  // Resolve a shot to a concrete position/look at time t, including its
+  // Bezier path, its orbit and its drift. Returned as a plain object so a
+  // blend can interpolate from where the previous shot actually was.
+  function sampleShot(shot, t) {
+    var inT = shot._in === undefined ? 0 : shot._in;
+    var dur = shot._dur === undefined ? 4 : shot._dur;
+    var u = dur > 0 ? Math.min(1, Math.max(0, (t - inT) / dur)) : 0;
+    var eu = smoothstep(u);
+
+    var px, py, pz;
+    if (shot.path) {
+      bez3(shot.path, eu, vTmp);
+      px = vTmp.x; py = vTmp.y; pz = vTmp.z;
+    } else if (shot.orbit) {
+      var o = shot.orbit;
+      var a = o.from + (o.to - o.from) * eu;
+      px = o.c[0] + Math.sin(a) * o.r;
+      py = o.y;
+      pz = o.c[2] + Math.cos(a) * o.r;
+    } else {
+      px = shot.pos[0]; py = shot.pos[1]; pz = shot.pos[2];
+    }
+
+    // drift: a slow wander so nothing is ever locked off
+    var d = shot.drift || [0.3, 0.12, 0.12];
+    px += Math.sin(t * 0.17 + 1.3) * d[0] * 0.14;
+    py += Math.sin(t * 0.23 + 2.1) * d[1] * 0.12;
+    pz += Math.sin(t * 0.13 + 0.7) * d[2] * 0.14;
+
+    var lk = shot.orbit ? shot.orbit.c : shot.look;
+    return { x: px, y: py, z: pz,
+             lx: lk[0], ly: lk[1], lz: lk[2], fov: shot.fov };
+  }
+
+  function solveCamera(t, dt) {
+    // mid-line subcuts
+    for (var s = subIdx + 1; s < SUBCUTS.length; s++) {
+      if (SUBCUTS[s].t <= t) {
+        cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
+        subIdx = s;
+      } else break;
+    }
+
+    var now = sampleShot(curShot, t);
+    if (shotT < 1) {
+      shotT = Math.min(1, shotT + dt / Math.max(0.0001, curShot._blend));
+      var e = smoothstep(shotT);
+      camera.position.set(
+        prevShot.x + (now.x - prevShot.x) * e,
+        prevShot.y + (now.y - prevShot.y) * e,
+        prevShot.z + (now.z - prevShot.z) * e);
+      vLook.set(
+        prevShot.lx + (now.lx - prevShot.lx) * e,
+        prevShot.ly + (now.ly - prevShot.ly) * e,
+        prevShot.lz + (now.lz - prevShot.lz) * e);
+      camera.fov = prevShot.fov + (now.fov - prevShot.fov) * e;
+    } else {
+      camera.position.set(now.x, now.y, now.z);
+      vLook.set(now.lx, now.ly, now.lz);
+      camera.fov = now.fov;
+    }
+    camera.lookAt(vLook);
+    camera.updateProjectionMatrix();
+  }
+
+  // ---------------------------------------------------------- the frame
+  function frame(t, dt) {
+    // ---- performances ----
+    var all = castList(C);
+    for (var i = 0; i < all.length; i++) {
+      var c = all[i];
+      if (!c.root.visible) continue;
+      // the speaker's jaw rides its own line's envelope; everyone else is shut
+      var isSp = (c === speaker);
+      c.s.talking = isSp ? 1 : 0;
+      c.s.jawOpen = isSp ? jawEnvelope(t, speakStart, speakDur, i * 1.7) : 0;
+      animatePerson(c, t, dt);
+    }
+
+    // walking characters actually travel
+    if (C.saul.root.visible && C.saul.s.walk > 0.01) {
+      C.saul.root.position.z += dt * 1.05 * C.saul.s.walk;
+    }
+    if (C.comp1.root.visible && C.comp1.s.walk > 0.01) {
+      C.comp1.root.position.z += dt * 1.05 * C.comp1.s.walk;
+      C.comp2.root.position.z += dt * 1.05 * C.comp2.s.walk;
+    }
+
+    // ---- camera ----
+    solveCamera(t, dt);
+
+    // ---- light ----
+    for (var k in targetMood) {
+      var cur = mood[k], tg = targetMood[k];
+      if (typeof tg === 'number') {
+        mood[k] = cur + (tg - cur) * (1 - Math.exp(-2.6 * dt));
+      } else {
+        mood[k] = tg;
+      }
+    }
+    L.sun.intensity = mood.sun;
+    L.sun.color.setHex(mood.sunCol);
+    L.amb.intensity = mood.amb;
+    L.amb.color.setHex(mood.ambSky);
+    L.amb.groundColor.setHex(mood.ambGnd);
+    scene.fog.near = mood.fogN;
+    scene.fog.far = mood.fogF;
+    scene.fog.color.setHex(mood.fogCol);
+    renderer.toneMappingExposure = mood.exp * (1 - blind * 0.92);
+
+    // ---- the holy shaft ----
+    var holy = mood.holy;
+    shaft.root.visible = holy > 0.004;
+    if (shaft.root.visible) {
+      var puls = 1 + Math.sin(t * 2.1) * 0.035;       // slow, never a flicker
+      for (var sh = 0; sh < shaft.shells.length; sh++) {
+        var S = shaft.shells[sh];
+        S.material.opacity = S.userData.base * holy * puls;
+        S.rotation.y = t * S.userData.spin;
+      }
+      shaft.core.material.opacity = holy * 0.55 * puls;
+      shaft.core.scale.setScalar(1 + holy * 0.5);
+      shaft.pool.material.opacity = holy * 0.34;
+      L.holy.intensity = holy * 9.5;
+      L.holySpot.intensity = holy * 13;
+    } else {
+      L.holy.intensity = 0;
+      L.holySpot.intensity = 0;
+    }
+
+    // motes: visible only while the shaft is
+    motes.pts.material.opacity = holy * 0.85;
+    if (holy > 0.004) {
+      for (var m = 0; m < motes.count; m++) {
+        var sd = motes.seed[m];
+        motes.pos[m * 3 + 1] = sd.y + Math.sin(t * sd.r * 0.33 + sd.p) * 0.55;
+        motes.pos[m * 3] = sd.x + Math.sin(t * sd.r * 0.21 + sd.p) * 0.3;
+      }
+      motes.geo.attributes.position.needsUpdate = true;
+    }
+
+    // road dust under walking feet
+    if (dustRoad) {
+      var walking = C.saul.root.visible && C.saul.s.walk > 0.01;
+      dustRoad.pts.material.opacity = walking ? 0.3 : 0;
+      if (walking) {
+        for (var dm = 0; dm < dustRoad.count; dm++) {
+          var ds = dustRoad.seed[dm];
+          dustRoad.pos[dm * 3 + 1] = (ds.y + Math.sin(t * ds.r + ds.p) * 0.1) % 0.6;
+        }
+        dustRoad.geo.attributes.position.needsUpdate = true;
+      }
+    }
+
+    // ---- interior lamps ----
+    var lampOn = (curScene === 5 || curScene === 6 || curScene === 7) ? 1 : 0;
+    var flick = 1 + Math.sin(t * 5.3) * 0.05 + Math.sin(t * 2.7) * 0.04;
+    L.lampA.intensity = lampOn * 1.55 * flick;
+    L.lampB.intensity = lampOn * 1.25 * (2 - flick);
+    var hs = curScene === 6 ? SETS.ananHouse : SETS.house;
+    if (lampOn && hs && hs.userData.lamps) {
+      var lm = hs.userData.lamps;
+      L.lampA.position.set(lm[0].root.position.x, lm[0].root.position.y + 0.1, lm[0].root.position.z);
+      if (lm[1]) L.lampB.position.set(lm[1].root.position.x, lm[1].root.position.y + 0.1, lm[1].root.position.z);
+      for (var fl = 0; fl < lm.length; fl++) {
+        lm[fl].flame.scale.set(1, 1 + Math.sin(t * 7.1 + fl) * 0.14, 1);
+        lm[fl].flame.material.opacity = 0.9 + Math.sin(t * 6.3 + fl * 2) * 0.08;
+      }
+    }
+
+    // the window carries the three-day passage: lit, dark, lit, dark, lit
+    if (curScene === 5 && SETS.house.userData.winLight) {
+      var u5 = Math.min(1, Math.max(0, (t - beatStart) / beatDur));
+      var day = 0.5 + 0.5 * Math.cos(u5 * Math.PI * 6);   // three full cycles
+      SETS.house.userData.winLight.material.opacity = 0.12 + day * 0.8;
+      SETS.house.userData.winLight.material.color.setHex(day > 0.5 ? 0xffe6b0 : 0x3a4258);
+    }
+
+    // ---- subjective blindness ----
+    blind += (blindTarget - blind) * (1 - Math.exp(-1.6 * dt));
+    if (ctx.vignette) {
+      ctx.vignette.material.opacity = blind * 0.97;
+      ctx.vignette.visible = blind > 0.004;
+    }
+
+    // ---- scales falling from his eyes ----
+    if (ctx.scalesFx) {
+      ctx.scalesFx.pts.material.opacity = scales * 0.9;
+      ctx.scalesFx.pts.visible = scales > 0.01;
+      if (scales > 0.01) {
+        for (var sf = 0; sf < ctx.scalesFx.count; sf++) {
+          var ss = ctx.scalesFx.seed[sf];
+          var fall = ((t - ctx.scalesT) * (0.4 + ss.r * 0.5)) % 1.0;
+          ctx.scalesFx.pos[sf * 3 + 1] = ss.y - fall * 0.55;
+          ctx.scalesFx.pos[sf * 3] = ss.x + Math.sin(t * 2 + ss.p) * 0.015;
+        }
+        ctx.scalesFx.geo.attributes.position.needsUpdate = true;
+        ctx.scalesFx.pts.position.set(
+          C.saul.root.position.x, 1.52 + C.saul.root.position.y, C.saul.root.position.z + 0.18);
+      }
+      scales *= Math.exp(-0.55 * dt);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  return {
+    applyBeat: applyBeat, frame: frame,
+    setBlind: function (v) { blindTarget = v; },
+    dropScales: function (t) { scales = 1; ctx.scalesT = t; },
+    get mood() { return mood; }
+  };
+}
+
+
+
+// ===== main ==============================================================
+  var DURATION = 198.97;
+  var RENDER_MODE = true;
+
+  var canvas = document.getElementById("stage");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true,
+                                           preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(1280, 720, false);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(38, 1280 / 720, 0.1, 400);
+
+  var lights = buildLights(scene);
+
+  // sets
+  var SETS = {
+    jerus: buildJerusalem(),
+    road: buildRoad(),
+    house: buildHouse({ winX: -2.4, benchX: 0.4 }),
+    ananHouse: buildHouse({ winX: 2.2, benchX: -0.9,
+                            lamps: [[-1.6, 1.58, -2.9], [2.0, 1.54, -2.9]] }),
+    court: buildCourtyard()
+  };
+  for (var sk in SETS) scene.add(SETS[sk]);
+
+  // cast
+  var cast = buildCast();
+  var allCast = castList(cast);
+  for (var ci = 0; ci < allCast.length; ci++) {
+    allCast[ci].root.visible = false;
+    scene.add(allCast[ci].root);
+  }
+
+  // the holy shaft sits on the road at the conversion point
+  var shaft = buildHolyShaft();
+  shaft.root.position.set(0, 0, -1.8);
+  scene.add(shaft.root);
+
+  var motes = buildMotes(520, 11, 15);
+  motes.pts.position.set(0, 0, -1.8);
+  scene.add(motes.pts);
+
+  var dustRoad = buildMotes(180, 4, 0.6);
+  dustRoad.pts.material.size = 0.035;
+  dustRoad.pts.material.color.setHex(0xc8ab82);
+  scene.add(dustRoad.pts);
+
+  // scales falling from his eyes - small translucent fragments, not gore
+  var scalesFx = buildMotes(44, 0.34, 0.1);
+  scalesFx.pts.material.size = 0.022;
+  scalesFx.pts.material.color.setHex(0xe8dcc4);
+  scalesFx.pts.visible = false;
+  scene.add(scalesFx.pts);
+
+  // a black plane locked to the camera: the subjective blindness fade
+  var vignette = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true,
+                                  opacity: 0, depthTest: false, depthWrite: false }));
+  vignette.visible = false;
+  vignette.renderOrder = 999;
+  var vigCam = new THREE.Scene();
+  vigCam.add(vignette);
+  var orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  var ctx = {
+    scene: scene, camera: camera, renderer: renderer,
+    cast: cast, sets: SETS, lights: lights,
+    shaft: shaft, motes: motes, dustRoad: dustRoad,
+    scalesFx: scalesFx, scalesT: 0, vignette: null,
+    acts: null
+  };
+
+  var film = makeFilm(ctx);
+  ctx.acts = buildActs(film);
+
+  // The blindness fade is a second pass over the finished frame.
+  var baseRender = renderer.render.bind(renderer);
+
+  var voice = document.getElementById("voice");
+  voice.src = AUDIO_SRC;
+
+  var transport = makeTransport({
+    beats: BEATS, duration: DURATION,
+    applyBeat: film.applyBeat,
+    frame: function (t, dt) {
+      film.frame(t, dt);
+      if (vignette.material.opacity > 0.004) {
+        renderer.autoClear = false;
+        baseRender(vigCam, orthoCam);
+        renderer.autoClear = true;
+      }
+    },
+    voice: voice, renderMode: RENDER_MODE
+  });
+  ctx.vignette = vignette;
+
+  // ------------------------------------------------------------- playback
+  var gate = document.getElementById("gate");
+  if (RENDER_MODE) {
+    gate.className = "off";
+    transport.reset();
+    window.__film = {
+      duration: DURATION,
+      reset: function () { transport.reset(); },
+      seekTo: function (t) { transport.advanceTo(t); },
+      grab: function (t) {
+        transport.advanceTo(t);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      }
+    };
+    window.__filmReady = true;
+  } else {
+    transport.reset();
+    var start = function () {
+      gate.className = "off";
+      transport.play();
+    };
+    gate.addEventListener("click", start);
+    window.addEventListener("keydown", function (e) {
+      if (e.key === " " || e.key === "Enter") start();
+    });
+    window.__filmReady = true;
+  }
+
+})();
+</script>
