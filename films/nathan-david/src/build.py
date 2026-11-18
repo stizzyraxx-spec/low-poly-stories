@@ -20,7 +20,18 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 ENGINE = os.path.join(ROOT, 'films', 'two-fathers', 'index.html')
 OUT = os.path.join(ROOT, 'films', 'nathan-david', 'index.html')
 
-DURATION = 155.25
+# Read the runtime from the narration itself: a hardcoded value silently
+# desyncs picture from sound the moment the track is replaced.
+def _narration_duration():
+    import subprocess
+    out = subprocess.run(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+         '-of', 'csv=p=0', os.path.join(HERE, 'narration.mp3')],
+        capture_output=True, text=True, check=True).stdout
+    return float(out.strip())
+
+
+DURATION = _narration_duration()
 
 
 # ------------------------------------------------------------------- set

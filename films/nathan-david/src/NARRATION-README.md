@@ -1,23 +1,26 @@
 # Narration for You Are the Man
 
-**This film has no narration recording yet.**
+The film is cut to `narration.mp3` — the Oliver Silk read of the Nathan and
+David script (178.13s, 29 lines, two speakers).
 
-`WRONG-job-narration.mp3` is the ElevenLabs file from `uploads/`
-(`ElevenLabs_2026-11-18T05_41_17_...mp3`, 155.25s). It narrates the story of
-**Job**, not Nathan and David. The film was aligned against it by mistake:
-`aligned.json` and `beats.js` carry 29 Nathan/David lines timed to Job's
-speech segments, so the lip-sync, cuts and lighting are all keyed to the
-wrong words.
+`align.py` regenerates `aligned.json` from `narration.mp3` + `script_lines.txt`:
+silence detection finds the speech regions, then each line claims a share of
+that speech weighted by its syllable count, so the cuts and performances are
+keyed to when words are actually said.
 
-The picture is correct and finished (throne room, Nathan standing, David
-seated, no bar props, no captions). Only the timing is wrong.
+## Replacing the narration
 
-## When the real narration arrives
+1. Drop the new file in as `narration.mp3`.
+2. `python3 -I align.py` — rewrites `aligned.json`.
+3. Copy the new `t`/`d` values into `beats.js` (camera, mood and action
+   choices stay as they are; only the timings change).
+4. `python3 -I build.py` — `DURATION` is read from the audio, not hardcoded.
+5. Re-render and encode.
 
-1. Drop it in as `narration.mp3`.
-2. Re-run the alignment that produced `aligned.json` (silencedetect ->
-   speech segments -> syllable-weighted per-line split over `script_lines.txt`).
-3. Regenerate `beats.js`, then `python3 -I build.py`.
-4. Re-render and encode. Nothing in the set, rigs or staging needs changing.
+## A note on checking the audio first
 
-Do not encode against `WRONG-job-narration.mp3`.
+An earlier pass built this film against a recording that turned out to narrate
+the book of Job. Duration and speech-rate arithmetic could not tell the two
+apart. What does: a two-hander leaves long pauses at every speaker change,
+while a single narrator does not. The Job read had 1 pause over 1.0s; this one
+has 34. Run that check before trusting a new file.
