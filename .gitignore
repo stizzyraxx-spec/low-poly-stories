@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# Finished films live in the GitHub release, not in git: a 26MB MP4 per
+# film per revision would bloat the history for no benefit, and the release
+# is what the pages link to anyway.
+films/*/src/*.mp4
