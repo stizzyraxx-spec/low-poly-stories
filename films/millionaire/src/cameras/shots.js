@@ -18,8 +18,8 @@ function buildShots(C) {
   S.oAerial  = { pos: [0, 34, 46], look: [0, 10, -20], fov: 46,
                  drift: [0.5, 0.2, 0.3],
                  path: [[6, 34, 54], [3, 14, 22], [0.6, 2.4, 4.2]] };
-  S.oManCU   = cu(C.man, { dist: 3.51, yaw: 0.42, fov: 27, blockers: BLOCK });
-  S.oAsstCU  = cu(C.asst, { dist: 3.38, yaw: -0.4, fov: 28, blockers: BLOCK });
+  S.oManCU   = cu(C.man, { dist: 2.9, yaw: 0.30, fov: 27, blockers: BLOCK });
+  S.oAsstCU  = cu(C.asst, { dist: 2.8, yaw: -0.28, fov: 28, blockers: BLOCK });
   S.oManLow  = hero(C.man, { dist: 4.29, height: 1.05, yaw: 0.3, fov: 33 });
   // the tablet: a tight shot of what she is showing him
   S.oTablet  = { derive: function (t, v, look) {
@@ -48,7 +48,11 @@ function buildShots(C) {
   S.aDoor    = wideOn(C.friend, { yaw: 0.9, dist: 4.42, height: 1.95, fov: 36 });
   S.aManCU   = cu(C.man, { dist: 2.99, yaw: 0.42, rise: 0.10, fov: 27, blockers: BLOCK });
   S.aFriendCU= cu(C.friend, { dist: 2.99, yaw: -0.42, rise: 0.10, fov: 27, blockers: BLOCK });
-  S.aTwo     = two(C.man, C.friend, { yaw: 0.45, dist: 2.86, rise: 0.5, fov: 34 });
+  // Scene 10 is the couple's moment, so the two-shot pairs the man with his
+  // WIFE and the camera sits on the open side of the couch. Pairing him with
+  // the friend, who sits opposite, put the camera behind the couple.
+  S.aTwo     = two(C.man, C.wife, { yaw: -0.55, dist: 2.5, rise: 0.4, fov: 35 });
+  S.aTwoFr   = two(C.man, C.friend, { yaw: 0.45, dist: 2.86, rise: 0.5, fov: 34 });
   S.aOver    = over(C.friend, C.man, { back: 1.9, side: 0.7, rise: 0.35, fov: 35 });
   S.aWide    = wideOn(C.man, { yaw: 0.7, dist: 6.76, height: 2.2, fov: 40 });
   // he looks at the photograph: frame him with it in shot

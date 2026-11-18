@@ -1256,22 +1256,22 @@ var MOODS = {
                skyTop: 0x18202e, lamp: 1.3, rain: 1 },
 
   // ---- 6-8: the apartment, evening ----
-  aptDusk:   { sun: 0.85, sunCol: 0xd0b094, amb: 0.80, ambSky: 0x95a0b2, ambGnd: 0x5c5248,
-               fogN: 16, fogF: 60, fogCol: 0x6e7280, exp: 0.98,
+  aptDusk:   { sun: 1.30, sunCol: 0xd0b094, amb: 1.05, ambSky: 0x95a0b2, ambGnd: 0x5c5248,
+               fogN: 16, fogF: 60, fogCol: 0x6e7280, exp: 1.04,
                skyTop: 0x5c6c86, lamp: 1.0, rain: 0 },
-  aptQuiet:  { sun: 0.70, sunCol: 0xc4a890, amb: 0.74, ambSky: 0x8a94a6, ambGnd: 0x544a40,
-               fogN: 15, fogF: 56, fogCol: 0x64687a, exp: 0.95,
+  aptQuiet:  { sun: 1.15, sunCol: 0xc4a890, amb: 1.00, ambSky: 0x8a94a6, ambGnd: 0x544a40,
+               fogN: 15, fogF: 56, fogCol: 0x64687a, exp: 1.02,
                skyTop: 0x4e5c74, lamp: 1.1, rain: 0 },
-  aptHard:   { sun: 0.62, sunCol: 0xb0a090, amb: 0.68, ambSky: 0x78839a, ambGnd: 0x4a4238,
-               fogN: 14, fogF: 52, fogCol: 0x5a5e6e, exp: 0.92,
+  aptHard:   { sun: 1.05, sunCol: 0xb0a090, amb: 0.94, ambSky: 0x78839a, ambGnd: 0x4a4238,
+               fogN: 14, fogF: 52, fogCol: 0x5a5e6e, exp: 1.00,
                skyTop: 0x44526a, lamp: 1.0, rain: 0 },
 
   // ---- 9-11: warmth returning, by degrees ----
-  aptWarm:   { sun: 0.70, sunCol: 0xd8b088, amb: 0.60, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
-               fogN: 15, fogF: 56, fogCol: 0x6a6258, exp: 0.94,
+  aptWarm:   { sun: 1.25, sunCol: 0xd8b088, amb: 1.00, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
+               fogN: 15, fogF: 56, fogCol: 0x6a6258, exp: 1.04,
                skyTop: 0x54596a, lamp: 1.2, rain: 0 },
-  aptHope:   { sun: 1.05, sunCol: 0xe8bc90, amb: 0.72, ambSky: 0x9a9690, ambGnd: 0x6a5842,
-               fogN: 18, fogF: 68, fogCol: 0x7e7264, exp: 0.98,
+  aptHope:   { sun: 1.55, sunCol: 0xe8bc90, amb: 1.08, ambSky: 0x9a9690, ambGnd: 0x6a5842,
+               fogN: 18, fogF: 68, fogCol: 0x7e7264, exp: 1.06,
                skyTop: 0x6e6a78, lamp: 1.0, rain: 0 },
 
   // ---- 12: sunrise. warm, but not the opening's brightness ----
@@ -1302,6 +1302,16 @@ function buildLights(scene) {
   var lampB = new THREE.PointLight(PAL.lampGlow, 0, 7, 1.8);
   scene.add(lampA);
   scene.add(lampB);
+
+  // A soft fill that follows whoever is speaking. The practicals use real
+  // falloff (distance 7, decay 1.8), so a figure standing 3-4 units from a
+  // table lamp receives almost nothing: measured on the first apartment
+  // render, the friend's FACE was darker than the wall behind him (YAVG 23
+  // vs 46). This is the bounce card a real interior scene would get - it
+  // carries no shadow and sits just off the lens axis, so it lifts faces
+  // without flattening the lamp's direction.
+  var fill = new THREE.PointLight(0xffd9b0, 0, 9, 1.1);
+  scene.add(fill);
 
   var fluoro = new THREE.DirectionalLight(PAL.fluoro, 0);
   fluoro.position.set(0, 12, 2);
@@ -1337,7 +1347,7 @@ function buildLights(scene) {
   sky.renderOrder = -1;
   scene.add(sky);
 
-  return { amb: amb, sun: sun, lampA: lampA, lampB: lampB, fluoro: fluoro,
+  return { amb: amb, sun: sun, lampA: lampA, lampB: lampB, fluoro: fluoro, fill: fill,
            sky: sky, skyMat: skyMat };
 }
 
@@ -1554,8 +1564,8 @@ function buildShots(C) {
   S.oAerial  = { pos: [0, 34, 46], look: [0, 10, -20], fov: 46,
                  drift: [0.5, 0.2, 0.3],
                  path: [[6, 34, 54], [3, 14, 22], [0.6, 2.4, 4.2]] };
-  S.oManCU   = cu(C.man, { dist: 3.51, yaw: 0.42, fov: 27, blockers: BLOCK });
-  S.oAsstCU  = cu(C.asst, { dist: 3.38, yaw: -0.4, fov: 28, blockers: BLOCK });
+  S.oManCU   = cu(C.man, { dist: 2.9, yaw: 0.30, fov: 27, blockers: BLOCK });
+  S.oAsstCU  = cu(C.asst, { dist: 2.8, yaw: -0.28, fov: 28, blockers: BLOCK });
   S.oManLow  = hero(C.man, { dist: 4.29, height: 1.05, yaw: 0.3, fov: 33 });
   // the tablet: a tight shot of what she is showing him
   S.oTablet  = { derive: function (t, v, look) {
@@ -1584,7 +1594,11 @@ function buildShots(C) {
   S.aDoor    = wideOn(C.friend, { yaw: 0.9, dist: 4.42, height: 1.95, fov: 36 });
   S.aManCU   = cu(C.man, { dist: 2.99, yaw: 0.42, rise: 0.10, fov: 27, blockers: BLOCK });
   S.aFriendCU= cu(C.friend, { dist: 2.99, yaw: -0.42, rise: 0.10, fov: 27, blockers: BLOCK });
-  S.aTwo     = two(C.man, C.friend, { yaw: 0.45, dist: 2.86, rise: 0.5, fov: 34 });
+  // Scene 10 is the couple's moment, so the two-shot pairs the man with his
+  // WIFE and the camera sits on the open side of the couch. Pairing him with
+  // the friend, who sits opposite, put the camera behind the couple.
+  S.aTwo     = two(C.man, C.wife, { yaw: -0.55, dist: 2.5, rise: 0.4, fov: 35 });
+  S.aTwoFr   = two(C.man, C.friend, { yaw: 0.45, dist: 2.86, rise: 0.5, fov: 34 });
   S.aOver    = over(C.friend, C.man, { back: 1.9, side: 0.7, rise: 0.35, fov: 35 });
   S.aWide    = wideOn(C.man, { yaw: 0.7, dist: 6.76, height: 2.2, fov: 40 });
   // he looks at the photograph: frame him with it in shot
@@ -1840,8 +1854,13 @@ function stageScene(n, C, SETS) {
     // facing +z. Their close-ups then frame desk and shelves behind them.
     // Staged the other way round - which the first two passes did - every
     // face shot backs onto empty sky.
-    place(C.man, 0.5, -3.3, 0.10);
-    place(C.asst, -1.5, -4.4, 0.32);
+    // Close enough to read as one conversation. At 2 units apart their
+    // singles each caught the other at the far frame edge with a wall of
+    // empty plaster between - a two-shot with a hole in it. Just over a
+    // metre apart, angled toward each other, gives each a clean single and
+    // keeps the two-shot tight.
+    place(C.man, 0.45, -3.4, 0.22);
+    place(C.asst, -0.75, -3.95, 0.42);
     return;
   }
 
@@ -1903,7 +1922,10 @@ function stageScene(n, C, SETS) {
       C.friend.s.kneel = 0.95;
     }
     if (n >= 10) {
-      place(C.wife, -0.2, -1.5, 0.25);
+      // Beside him on the couch, not between him and the camera. Seated at
+      // (-0.2,-1.5) she blocked the man in every two-shot and the scene
+      // played as three backs of heads.
+      place(C.wife, -1.95, -1.55, 0.30);
       C.wife.root.position.y = 0.26;
       C.wife.s.kneel = 0.95;
     }
@@ -2633,6 +2655,16 @@ function makeFilm(ctx) {
     }
     // the hospital's ceiling panels, which are the only light in scene 4
     L.fluoro.intensity = SETS.hospital.visible ? 1.5 : 0;
+
+    // Fill: park it just behind and above the camera, aimed into the scene,
+    // so the speaker's face is lit from roughly the lens axis. Interiors
+    // only - exteriors have the sun.
+    var interior = SETS.residence.visible || SETS.apartment.visible;
+    L.fill.intensity = interior ? (mood.fill === undefined ? 1.5 : mood.fill) : 0;
+    if (L.fill.intensity > 0) {
+      L.fill.position.set(camera.position.x, camera.position.y + 0.5,
+                          camera.position.z);
+    }
 
     // ---- rain outside the residence glass ----
     if (SETS.residence.visible && SETS.residence.userData.rain) {

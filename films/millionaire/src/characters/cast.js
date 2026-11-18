@@ -129,8 +129,13 @@ function stageScene(n, C, SETS) {
     // facing +z. Their close-ups then frame desk and shelves behind them.
     // Staged the other way round - which the first two passes did - every
     // face shot backs onto empty sky.
-    place(C.man, 0.5, -3.3, 0.10);
-    place(C.asst, -1.5, -4.4, 0.32);
+    // Close enough to read as one conversation. At 2 units apart their
+    // singles each caught the other at the far frame edge with a wall of
+    // empty plaster between - a two-shot with a hole in it. Just over a
+    // metre apart, angled toward each other, gives each a clean single and
+    // keeps the two-shot tight.
+    place(C.man, 0.45, -3.4, 0.22);
+    place(C.asst, -0.75, -3.95, 0.42);
     return;
   }
 
@@ -192,7 +197,10 @@ function stageScene(n, C, SETS) {
       C.friend.s.kneel = 0.95;
     }
     if (n >= 10) {
-      place(C.wife, -0.2, -1.5, 0.25);
+      // Beside him on the couch, not between him and the camera. Seated at
+      // (-0.2,-1.5) she blocked the man in every two-shot and the scene
+      // played as three backs of heads.
+      place(C.wife, -1.95, -1.55, 0.30);
       C.wife.root.position.y = 0.26;
       C.wife.s.kneel = 0.95;
     }

@@ -230,6 +230,16 @@ function makeFilm(ctx) {
     // the hospital's ceiling panels, which are the only light in scene 4
     L.fluoro.intensity = SETS.hospital.visible ? 1.5 : 0;
 
+    // Fill: park it just behind and above the camera, aimed into the scene,
+    // so the speaker's face is lit from roughly the lens axis. Interiors
+    // only - exteriors have the sun.
+    var interior = SETS.residence.visible || SETS.apartment.visible;
+    L.fill.intensity = interior ? (mood.fill === undefined ? 1.5 : mood.fill) : 0;
+    if (L.fill.intensity > 0) {
+      L.fill.position.set(camera.position.x, camera.position.y + 0.5,
+                          camera.position.z);
+    }
+
     // ---- rain outside the residence glass ----
     if (SETS.residence.visible && SETS.residence.userData.rain) {
       var R = SETS.residence.userData.rain;

@@ -50,22 +50,22 @@ var MOODS = {
                skyTop: 0x18202e, lamp: 1.3, rain: 1 },
 
   // ---- 6-8: the apartment, evening ----
-  aptDusk:   { sun: 0.85, sunCol: 0xd0b094, amb: 0.80, ambSky: 0x95a0b2, ambGnd: 0x5c5248,
-               fogN: 16, fogF: 60, fogCol: 0x6e7280, exp: 0.98,
+  aptDusk:   { sun: 1.30, sunCol: 0xd0b094, amb: 1.05, ambSky: 0x95a0b2, ambGnd: 0x5c5248,
+               fogN: 16, fogF: 60, fogCol: 0x6e7280, exp: 1.04,
                skyTop: 0x5c6c86, lamp: 1.0, rain: 0 },
-  aptQuiet:  { sun: 0.70, sunCol: 0xc4a890, amb: 0.74, ambSky: 0x8a94a6, ambGnd: 0x544a40,
-               fogN: 15, fogF: 56, fogCol: 0x64687a, exp: 0.95,
+  aptQuiet:  { sun: 1.15, sunCol: 0xc4a890, amb: 1.00, ambSky: 0x8a94a6, ambGnd: 0x544a40,
+               fogN: 15, fogF: 56, fogCol: 0x64687a, exp: 1.02,
                skyTop: 0x4e5c74, lamp: 1.1, rain: 0 },
-  aptHard:   { sun: 0.62, sunCol: 0xb0a090, amb: 0.68, ambSky: 0x78839a, ambGnd: 0x4a4238,
-               fogN: 14, fogF: 52, fogCol: 0x5a5e6e, exp: 0.92,
+  aptHard:   { sun: 1.05, sunCol: 0xb0a090, amb: 0.94, ambSky: 0x78839a, ambGnd: 0x4a4238,
+               fogN: 14, fogF: 52, fogCol: 0x5a5e6e, exp: 1.00,
                skyTop: 0x44526a, lamp: 1.0, rain: 0 },
 
   // ---- 9-11: warmth returning, by degrees ----
-  aptWarm:   { sun: 0.70, sunCol: 0xd8b088, amb: 0.60, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
-               fogN: 15, fogF: 56, fogCol: 0x6a6258, exp: 0.94,
+  aptWarm:   { sun: 1.25, sunCol: 0xd8b088, amb: 1.00, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
+               fogN: 15, fogF: 56, fogCol: 0x6a6258, exp: 1.04,
                skyTop: 0x54596a, lamp: 1.2, rain: 0 },
-  aptHope:   { sun: 1.05, sunCol: 0xe8bc90, amb: 0.72, ambSky: 0x9a9690, ambGnd: 0x6a5842,
-               fogN: 18, fogF: 68, fogCol: 0x7e7264, exp: 0.98,
+  aptHope:   { sun: 1.55, sunCol: 0xe8bc90, amb: 1.08, ambSky: 0x9a9690, ambGnd: 0x6a5842,
+               fogN: 18, fogF: 68, fogCol: 0x7e7264, exp: 1.06,
                skyTop: 0x6e6a78, lamp: 1.0, rain: 0 },
 
   // ---- 12: sunrise. warm, but not the opening's brightness ----
@@ -96,6 +96,16 @@ function buildLights(scene) {
   var lampB = new THREE.PointLight(PAL.lampGlow, 0, 7, 1.8);
   scene.add(lampA);
   scene.add(lampB);
+
+  // A soft fill that follows whoever is speaking. The practicals use real
+  // falloff (distance 7, decay 1.8), so a figure standing 3-4 units from a
+  // table lamp receives almost nothing: measured on the first apartment
+  // render, the friend's FACE was darker than the wall behind him (YAVG 23
+  // vs 46). This is the bounce card a real interior scene would get - it
+  // carries no shadow and sits just off the lens axis, so it lifts faces
+  // without flattening the lamp's direction.
+  var fill = new THREE.PointLight(0xffd9b0, 0, 9, 1.1);
+  scene.add(fill);
 
   var fluoro = new THREE.DirectionalLight(PAL.fluoro, 0);
   fluoro.position.set(0, 12, 2);
@@ -131,6 +141,6 @@ function buildLights(scene) {
   sky.renderOrder = -1;
   scene.add(sky);
 
-  return { amb: amb, sun: sun, lampA: lampA, lampB: lampB, fluoro: fluoro,
+  return { amb: amb, sun: sun, lampA: lampA, lampB: lampB, fluoro: fluoro, fill: fill,
            sky: sky, skyMat: skyMat };
 }
