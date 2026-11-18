@@ -1,0 +1,330 @@
+[
+ {
+  "spk": "SAUL",
+  "text": "Arrest them! Every last one of them! Anyone preaching the name of Jesus must be brought before the authorities!",
+  "t": 0.0,
+  "d": 8.38,
+  "spans": 3,
+  "said": 7.61
+ },
+ {
+  "spk": "CHRISTIAN",
+  "text": "But we've done nothing wrong! We only follow the teachings of Jesus!",
+  "t": 8.38,
+  "d": 4.93,
+  "spans": 2,
+  "said": 4.25
+ },
+ {
+  "spk": "SAUL",
+  "text": "That man was a false Messiah! And I will not rest until his followers are silenced!",
+  "t": 13.3,
+  "d": 7.58,
+  "spans": 2,
+  "said": 6.3
+ },
+ {
+  "spk": "COMPANION",
+  "text": "Saul, where are you going?",
+  "t": 20.88,
+  "d": 2.85,
+  "spans": 2,
+  "said": 1.86
+ },
+ {
+  "spk": "SAUL",
+  "text": "To Damascus. I've received permission to arrest anyone who follows this Jesus. Men or women, it makes no difference. I'll bring them back to Jerusalem in chains!",
+  "t": 23.74,
+  "d": 10.52,
+  "spans": 4,
+  "said": 10.04
+ },
+ {
+  "spk": "COMPANION",
+  "text": "Then may God be with you on your journey.",
+  "t": 34.26,
+  "d": 3.76,
+  "spans": 2,
+  "said": 2.95
+ },
+ {
+  "spk": "SAUL",
+  "text": "Wait! What is that light? It's brighter than the sun! I can't see!",
+  "t": 38.02,
+  "d": 5.29,
+  "spans": 4,
+  "said": 4.78
+ },
+ {
+  "spk": "JESUS",
+  "text": "Saul! Saul! Why are you persecuting me?",
+  "t": 43.31,
+  "d": 3.15,
+  "spans": 2,
+  "said": 2.42
+ },
+ {
+  "spk": "SAUL",
+  "text": "Who are you, Lord?",
+  "t": 46.46,
+  "d": 1.12,
+  "spans": 1,
+  "said": 0.69
+ },
+ {
+  "spk": "JESUS",
+  "text": "I am Jesus, whom you are persecuting.",
+  "t": 47.58,
+  "d": 4.17,
+  "spans": 3,
+  "said": 3.61
+ },
+ {
+  "spk": "SAUL",
+  "text": "Jesus? But... you're dead!",
+  "t": 51.74,
+  "d": 1.94,
+  "spans": 2,
+  "said": 1.51
+ },
+ {
+  "spk": "JESUS",
+  "text": "Rise and enter the city. There you will be told what you must do.",
+  "t": 53.68,
+  "d": 4.77,
+  "spans": 2,
+  "said": 4.38
+ },
+ {
+  "spk": "SAUL",
+  "text": "I can't see! My eyes! Everything is dark!",
+  "t": 58.45,
+  "d": 3.64,
+  "spans": 3,
+  "said": 3.22
+ },
+ {
+  "spk": "COMPANION",
+  "text": "Saul! What's happened to you?",
+  "t": 62.09,
+  "d": 2.18,
+  "spans": 2,
+  "said": 1.81
+ },
+ {
+  "spk": "SAUL",
+  "text": "I heard a voice... It was Jesus! He spoke to me! Please, help me. I cannot see!",
+  "t": 64.27,
+  "d": 6.15,
+  "spans": 5,
+  "said": 5.62
+ },
+ {
+  "spk": "COMPANION",
+  "text": "Come, we'll lead you into Damascus.",
+  "t": 70.42,
+  "d": 2.47,
+  "spans": 2,
+  "said": 2.1
+ },
+ {
+  "spk": "SAUL",
+  "text": "Three days have passed, and I still cannot see. I haven't eaten or drunk anything. Lord, what have I done?",
+  "t": 72.88,
+  "d": 9.24,
+  "spans": 5,
+  "said": 8.0
+ },
+ {
+  "spk": "JESUS",
+  "text": "Ananias!",
+  "t": 82.13,
+  "d": 1.11,
+  "spans": 1,
+  "said": 0.68
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Yes, Lord?",
+  "t": 83.24,
+  "d": 0.91,
+  "spans": 1,
+  "said": 0.43
+ },
+ {
+  "spk": "JESUS",
+  "text": "Go to the house of Judas on Straight Street. Ask for a man named Saul of Tarsus. He is praying.",
+  "t": 84.15,
+  "d": 6.56,
+  "spans": 3,
+  "said": 5.83
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Lord, I've heard about this man! He's imprisoned your followers and brought terrible suffering upon your people!",
+  "t": 90.71,
+  "d": 7.75,
+  "spans": 3,
+  "said": 6.74
+ },
+ {
+  "spk": "JESUS",
+  "text": "Go, for he is my chosen instrument to carry my name before the nations, kings, and the people of Israel.",
+  "t": 98.46,
+  "d": 7.83,
+  "spans": 4,
+  "said": 7.02
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Then I will obey you, Lord.",
+  "t": 106.29,
+  "d": 2.46,
+  "spans": 1,
+  "said": 1.21
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Saul? Are you here?",
+  "t": 108.75,
+  "d": 1.35,
+  "spans": 1,
+  "said": 0.43
+ },
+ {
+  "spk": "SAUL",
+  "text": "Who's there?",
+  "t": 110.1,
+  "d": 1.66,
+  "spans": 1,
+  "said": 0.56
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "My name is Ananias. The Lord Jesus, who appeared to you on the road, has sent me so that you may see again and be filled with the Holy Spirit.",
+  "t": 111.76,
+  "d": 12.5,
+  "spans": 8,
+  "said": 11.96
+ },
+ {
+  "spk": "SAUL",
+  "text": "Jesus sent you? Even after everything I've done?",
+  "t": 124.26,
+  "d": 3.29,
+  "spans": 2,
+  "said": 2.96
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Yes, brother Saul. Receive your sight.",
+  "t": 127.55,
+  "d": 2.13,
+  "spans": 2,
+  "said": 1.56
+ },
+ {
+  "spk": "SAUL",
+  "text": "I... I can see! The darkness is gone! God has opened my eyes!",
+  "t": 129.68,
+  "d": 5.35,
+  "spans": 3,
+  "said": 4.85
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "Then rise, Saul, and be baptized.",
+  "t": 135.03,
+  "d": 2.65,
+  "spans": 2,
+  "said": 2.24
+ },
+ {
+  "spk": "SAUL",
+  "text": "I spent my life believing I was serving God, yet I was fighting against His own Son.",
+  "t": 137.68,
+  "d": 6.07,
+  "spans": 2,
+  "said": 5.02
+ },
+ {
+  "spk": "ANANIAS",
+  "text": "And what will you do now?",
+  "t": 143.75,
+  "d": 2.07,
+  "spans": 1,
+  "said": 0.94
+ },
+ {
+  "spk": "SAUL",
+  "text": "I will preach the truth. Jesus is the Son of God!",
+  "t": 145.82,
+  "d": 5.28,
+  "spans": 2,
+  "said": 4.42
+ },
+ {
+  "spk": "CITIZEN_A",
+  "text": "Isn't that the man who came here to arrest the followers of Jesus?",
+  "t": 151.1,
+  "d": 3.96,
+  "spans": 1,
+  "said": 3.0
+ },
+ {
+  "spk": "CITIZEN_B",
+  "text": "It is! He was dragging Christians away in chains! Now he's preaching their message?",
+  "t": 155.06,
+  "d": 6.57,
+  "spans": 3,
+  "said": 5.78
+ },
+ {
+  "spk": "SAUL",
+  "text": "Listen to me! I once persecuted those who followed Jesus. I believed they were my enemies. But on that road, I discovered that I was the one who was blind long before I lost my sight.",
+  "t": 161.64,
+  "d": 13.8,
+  "spans": 6,
+  "said": 12.9
+ },
+ {
+  "spk": "CITIZEN_A",
+  "text": "And now?",
+  "t": 175.44,
+  "d": 1.34,
+  "spans": 1,
+  "said": 0.41
+ },
+ {
+  "spk": "SAUL",
+  "text": "Now I know the truth. Jesus Christ is the Son of God, and I will spend my life proclaiming His name!",
+  "t": 176.78,
+  "d": 7.06,
+  "spans": 3,
+  "said": 6.56
+ },
+ {
+  "spk": "CITIZEN_B",
+  "text": "Even after all the evil you've done?",
+  "t": 183.84,
+  "d": 2.78,
+  "spans": 1,
+  "said": 2.26
+ },
+ {
+  "spk": "SAUL",
+  "text": "If God can show mercy to a man like me, then no one is beyond the reach of His grace.",
+  "t": 186.62,
+  "d": 6.03,
+  "spans": 2,
+  "said": 5.54
+ },
+ {
+  "spk": "NARRATOR",
+  "text": "For the man who once hunted Christians had become a servant of the very Savior he tried to destroy.",
+  "t": 192.64,
+  "d": 6.33,
+  "spans": 3,
+  "said": 5.95
+ }
+]
