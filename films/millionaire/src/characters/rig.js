@@ -88,8 +88,10 @@ function buildPerson(cfg) {
     chest.add(jacket);
   }
 
+  // The tie is its own object so it can come off with the suit.
+  var tie = null;
   if (cfg.tie) {
-    var tie = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.34, 0.025), mat(cfg.tie));
+    tie = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.34, 0.025), mat(cfg.tie));
     tie.position.set(0, 0.16, 0.148);
     chest.add(tie);
   }
@@ -252,7 +254,7 @@ function buildPerson(cfg) {
     root: P, hips: hips, torso: torso, chest: chest, neck: neck, head: head,
     jaw: jaw, mouth: mouth, brow: brow, eyeL: eyeL, eyeR: eyeR,
     armL: armL, armR: armR, legL: legL, legR: legR, robe: robe,
-    jacket: jacket, watch: watch,
+    jacket: jacket, watch: watch, tie: tie, shirt: ribs,
     // per-character animation state, eased toward targets every frame
     s: {
       lean: 0, slump: 0, headDown: 0, headTurn: 0, headTilt: 0,

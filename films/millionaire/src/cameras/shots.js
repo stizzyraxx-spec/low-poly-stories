@@ -32,8 +32,8 @@ function buildShots(C) {
 
   // ---- 4: the hospital ----
   S.hRush    = wideOn(C.man, { yaw: 2.9, dist: 5.98, height: 1.9, fov: 38 });
-  S.hDocCU   = cu(C.doc, { dist: 3.25, yaw: 0.0, fov: 28, blockers: BLOCK });
-  S.hManCU   = cu(C.man, { dist: 2.99, yaw: 0.25, fov: 26, blockers: BLOCK });
+  S.hDocCU   = cu(C.doc, { dist: 4.0, yaw: 0.05, fov: 28, blockers: BLOCK });
+  S.hManCU   = cu(C.man, { dist: 3.9, yaw: 0.2, fov: 26, blockers: BLOCK });
   S.hTwo     = two(C.man, C.wife, { yaw: 0.4, dist: 2.86, fov: 34 });
   S.hWide    = wideOn(C.man, { yaw: 2.6, dist: 9.75, height: 2.6, fov: 42 });
 
@@ -71,9 +71,9 @@ function buildShots(C) {
 
   // ---- 12: the street ----
   S.sWalk    = wideOn(C.man, { yaw: 0.6, dist: 6.50, height: 1.8, fov: 38 });
-  S.sPullUp  = { pos: [3.0, 2.2, 7.0], look: [-4, 1.3, -4], fov: 42,
+  S.sPullUp  = { pos: [1.5, 2.2, 7.0], look: [-6.5, 1.3, -4], fov: 42,
                  drift: [0.4, 0.18, 0.2],
-                 path: [[3.0, 2.2, 7.0], [2.0, 11.0, 18.0], [0.0, 30.0, 40.0]] };
+                 path: [[1.5, 2.2, 7.0], [1.0, 11.0, 18.0], [-1.0, 30.0, 40.0]] };
 
   for (var k in S) SHOTS[k] = S[k];
   return SHOTS;

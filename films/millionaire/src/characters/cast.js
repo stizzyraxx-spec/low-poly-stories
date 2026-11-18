@@ -91,8 +91,15 @@ function clearPose(c) {
 // step with itself. 0 = the opening, 1 = the apartment.
 function setDecline(C, level) {
   var m = C.man;
-  if (m.jacket) m.jacket.visible = level < 0.5;
-  m.robe.material.color.setHex(level < 0.5 ? PAL.suitCharcoal : PAL.jeans);
+  var suited = level < 0.5;
+  // The brief: the tailored suit is eventually replaced with simple clothing.
+  // Jacket, tie and the dress shirt all go together - leaving the white shirt
+  // and red tie on in the apartment reads as a man still dressed for the
+  // office, which is the opposite of the scene.
+  if (m.jacket) m.jacket.visible = suited;
+  if (m.tie) m.tie.visible = suited;
+  if (m.shirt) m.shirt.material.color.setHex(suited ? PAL.shirtWhite : PAL.plainShirt);
+  m.robe.material.color.setHex(suited ? PAL.suitCharcoal : PAL.jeans);
   // posture floor: he never fully straightens again until scene 10
   m.s.slump = Math.max(m.s.slump, level * 0.35);
 }
@@ -143,12 +150,16 @@ function stageScene(n, C, SETS) {
     setWatch(C, true);
     place(C.man, 0.1, -3.2, Math.PI);          // facing down the corridor
     place(C.doc, -0.2, -7.4, 0);
-    place(C.wife, 2.6, -2.0, -0.7);
-    // staff at a distance, deliberately not the subject
-    place(C.extras[0], -3.2, -9.5, 0.4);
-    place(C.extras[1], 2.9, -10.2, -0.3);
-    C.extras[0].s.walk = 0.4;
-    C.extras[1].s.walk = 0.3;
+    // The wife sits in the waiting area off to one side. Closer than about
+    // 3 units she intrudes on the man's close-up, which framed four bodies
+    // at once in the first render.
+    place(C.wife, 3.4, -0.6, -0.9);
+    // Staff at a distance and walking AWAY down the corridor, so they recede
+    // instead of closing on the camera as the scene plays.
+    place(C.extras[0], -3.4, -10.5, 0.1);
+    place(C.extras[1], 3.1, -11.5, -0.1);
+    C.extras[0].s.walk = 0.35;
+    C.extras[1].s.walk = 0.28;
     return;
   }
 
@@ -193,12 +204,16 @@ function stageScene(n, C, SETS) {
     SETS.street.visible = true;
     setDecline(C, 1);
     setWatch(C, false);
-    place(C.man, -5.0, 2.0, Math.PI);
+    // Lamp posts stand at x=+-5.4 and street trees at +-5.2, so walking at
+    // x=-5.0 put him through them - a post ran clean through his head in the
+    // first render. The sidewalk spans x=-9..-4, so -7.2 is clear of both
+    // the furniture and the shopfronts at -9.5.
+    place(C.man, -7.2, 2.0, Math.PI);
     C.man.s.walk = 1;
     C.man.s.slump = 0.12;
     // the city keeps running
-    var ped = [[-6.2, -7, 0], [-4.4, -14, Math.PI], [5.6, -5, Math.PI],
-               [6.4, -12, 0], [-5.8, -20, Math.PI], [5.2, -18, 0]];
+    var ped = [[-6.4, -7, 0], [-7.8, -14, Math.PI], [6.6, -5, Math.PI],
+               [7.4, -12, 0], [-6.8, -20, Math.PI], [6.2, -18, 0]];
     for (var p = 0; p < ped.length && p < C.extras.length; p++) {
       place(C.extras[p], ped[p][0], ped[p][1], ped[p][2]);
       C.extras[p].s.walk = 0.75 + (p % 3) * 0.12;
