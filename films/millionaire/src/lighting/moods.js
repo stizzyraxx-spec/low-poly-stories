@@ -34,23 +34,28 @@ var MOODS = {
                skyTop: 0xb0c0cc, lamp: 0, rain: 0 },
 
   // ---- 5: the luxury house at night, rain outside ----
-  nightHome: { sun: 0.10, sunCol: 0x6a80a8, amb: 0.34, ambSky: 0x3a4a66, ambGnd: 0x24242c,
-               fogN: 14, fogF: 70, fogCol: 0x222a38, exp: 0.86,
-               skyTop: 0x141a26, lamp: 1.5, rain: 1 },
-  nightCold: { sun: 0.06, sunCol: 0x5a7098, amb: 0.26, ambSky: 0x2e3a52, ambGnd: 0x1c1c22,
-               fogN: 11, fogF: 56, fogCol: 0x1a2230, exp: 0.82,
-               skyTop: 0x101620, lamp: 1.2, rain: 1 },
+  // Night, but READABLE. The first pass at these two was so dark the man's
+  // face was lost and the city outside the window disappeared entirely; the
+  // brief asks for blue-grey night with isolated warm lamps, not near-black.
+  // Moonlight-coloured key plus a lifted ambient keeps the figures legible
+  // while the palette stays cold.
+  nightHome: { sun: 0.62, sunCol: 0x8ea4cc, amb: 0.86, ambSky: 0x62789c, ambGnd: 0x3a3a46,
+               fogN: 20, fogF: 110, fogCol: 0x2e3a4e, exp: 1.02,
+               skyTop: 0x1e2838, lamp: 1.5, rain: 1 },
+  nightCold: { sun: 0.50, sunCol: 0x8098c4, amb: 0.74, ambSky: 0x54688c, ambGnd: 0x32323e,
+               fogN: 17, fogF: 92, fogCol: 0x263044, exp: 0.98,
+               skyTop: 0x18202e, lamp: 1.3, rain: 1 },
 
   // ---- 6-8: the apartment, evening ----
-  aptDusk:   { sun: 0.55, sunCol: 0xc8a888, amb: 0.52, ambSky: 0x7a8496, ambGnd: 0x4a4238,
-               fogN: 13, fogF: 48, fogCol: 0x5a5e68, exp: 0.90,
-               skyTop: 0x4a5a70, lamp: 1.0, rain: 0 },
-  aptQuiet:  { sun: 0.40, sunCol: 0xbca088, amb: 0.46, ambSky: 0x6e7888, ambGnd: 0x423c34,
-               fogN: 12, fogF: 44, fogCol: 0x4e525c, exp: 0.88,
-               skyTop: 0x3e4c60, lamp: 1.1, rain: 0 },
-  aptHard:   { sun: 0.34, sunCol: 0xa89888, amb: 0.40, ambSky: 0x60697a, ambGnd: 0x383228,
-               fogN: 11, fogF: 40, fogCol: 0x464a54, exp: 0.85,
-               skyTop: 0x36424f, lamp: 1.0, rain: 0 },
+  aptDusk:   { sun: 0.85, sunCol: 0xd0b094, amb: 0.80, ambSky: 0x95a0b2, ambGnd: 0x5c5248,
+               fogN: 16, fogF: 60, fogCol: 0x6e7280, exp: 0.98,
+               skyTop: 0x5c6c86, lamp: 1.0, rain: 0 },
+  aptQuiet:  { sun: 0.70, sunCol: 0xc4a890, amb: 0.74, ambSky: 0x8a94a6, ambGnd: 0x544a40,
+               fogN: 15, fogF: 56, fogCol: 0x64687a, exp: 0.95,
+               skyTop: 0x4e5c74, lamp: 1.1, rain: 0 },
+  aptHard:   { sun: 0.62, sunCol: 0xb0a090, amb: 0.68, ambSky: 0x78839a, ambGnd: 0x4a4238,
+               fogN: 14, fogF: 52, fogCol: 0x5a5e6e, exp: 0.92,
+               skyTop: 0x44526a, lamp: 1.0, rain: 0 },
 
   // ---- 9-11: warmth returning, by degrees ----
   aptWarm:   { sun: 0.70, sunCol: 0xd8b088, amb: 0.60, ambSky: 0x8a8a90, ambGnd: 0x584a3a,
