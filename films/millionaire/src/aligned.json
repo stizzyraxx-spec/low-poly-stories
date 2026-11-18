@@ -1,0 +1,370 @@
+[
+ {
+  "spk": "ASSISTANT",
+  "text": "Sir, we have a serious problem.",
+  "t": 0.0,
+  "d": 1.85,
+  "spans": 1,
+  "said": 1.49
+ },
+ {
+  "spk": "MAN",
+  "text": "What is it? I'm about to walk into a meeting.",
+  "t": 1.85,
+  "d": 4.69,
+  "spans": 3,
+  "said": 4.18
+ },
+ {
+  "spk": "ASSISTANT",
+  "text": "The company stock just crashed. Investors are pulling out, and the banks have frozen our accounts.",
+  "t": 6.54,
+  "d": 6.84,
+  "spans": 3,
+  "said": 6.5
+ },
+ {
+  "spk": "MAN",
+  "text": "What? That's impossible! We made forty million dollars last quarter!",
+  "t": 13.38,
+  "d": 3.74,
+  "spans": 1,
+  "said": 2.42
+ },
+ {
+  "spk": "ASSISTANT",
+  "text": "Sir, we're facing bankruptcy.",
+  "t": 17.12,
+  "d": 2.72,
+  "spans": 1,
+  "said": 1.76
+ },
+ {
+  "spk": "MAN",
+  "text": "Bankruptcy? I've spent twenty years building this company! Fix it!",
+  "t": 19.84,
+  "d": 4.9,
+  "spans": 3,
+  "said": 4.31
+ },
+ {
+  "spk": "ASSISTANT",
+  "text": "We've tried everything. I'm sorry.",
+  "t": 24.74,
+  "d": 3.46,
+  "spans": 2,
+  "said": 2.21
+ },
+ {
+  "spk": "MAN",
+  "text": "No... No, this can't be happening.",
+  "t": 28.2,
+  "d": 3.28,
+  "spans": 2,
+  "said": 2.42
+ },
+ {
+  "spk": "WIFE",
+  "text": "Honey, you need to come to the hospital. There's been an accident.",
+  "t": 31.48,
+  "d": 4.08,
+  "spans": 2,
+  "said": 2.69
+ },
+ {
+  "spk": "MAN",
+  "text": "What accident? What happened?",
+  "t": 35.56,
+  "d": 2.18,
+  "spans": 1,
+  "said": 0.94
+ },
+ {
+  "spk": "WIFE",
+  "text": "It's our son. Please, just get here.",
+  "t": 37.74,
+  "d": 3.04,
+  "spans": 2,
+  "said": 2.61
+ },
+ {
+  "spk": "MAN",
+  "text": "Doctor! Where's my son? Is he okay?",
+  "t": 40.77,
+  "d": 4.28,
+  "spans": 3,
+  "said": 3.29
+ },
+ {
+  "spk": "DOCTOR",
+  "text": "Sir, we did everything we could. I'm so sorry.",
+  "t": 45.05,
+  "d": 3.58,
+  "spans": 2,
+  "said": 2.78
+ },
+ {
+  "spk": "MAN",
+  "text": "No... Please, God, no. Take everything I own, but not my boy!",
+  "t": 48.64,
+  "d": 4.6,
+  "spans": 2,
+  "said": 3.25
+ },
+ {
+  "spk": "MAN",
+  "text": "I don't understand. I've worked hard my entire life. I've given to charity. I've helped people. Why is God doing this to me?",
+  "t": 53.24,
+  "d": 10.89,
+  "spans": 5,
+  "said": 9.61
+ },
+ {
+  "spk": "WIFE",
+  "text": "Maybe you should stop pretending God cares about you. Look at what He's allowed to happen!",
+  "t": 64.13,
+  "d": 5.63,
+  "spans": 2,
+  "said": 4.8
+ },
+ {
+  "spk": "MAN",
+  "text": "What am I supposed to do? Curse Him? Turn my back on Him because my life fell apart?",
+  "t": 69.76,
+  "d": 6.68,
+  "spans": 3,
+  "said": 5.45
+ },
+ {
+  "spk": "WIFE",
+  "text": "You've lost your company, your money, and now your son. What else is there?",
+  "t": 76.44,
+  "d": 6.39,
+  "spans": 4,
+  "said": 5.25
+ },
+ {
+  "spk": "MAN",
+  "text": "I don't know anymore.",
+  "t": 82.82,
+  "d": 1.81,
+  "spans": 1,
+  "said": 0.74
+ },
+ {
+  "spk": "FRIEND",
+  "text": "Man, I heard about everything. I'm sorry.",
+  "t": 84.63,
+  "d": 3.42,
+  "spans": 2,
+  "said": 2.6
+ },
+ {
+  "spk": "MAN",
+  "text": "Thanks for coming.",
+  "t": 88.05,
+  "d": 1.39,
+  "spans": 1,
+  "said": 0.52
+ },
+ {
+  "spk": "FRIEND",
+  "text": "But I've got to ask you something. What did you do?",
+  "t": 89.44,
+  "d": 4.98,
+  "spans": 2,
+  "said": 3.42
+ },
+ {
+  "spk": "MAN",
+  "text": "What do you mean?",
+  "t": 94.42,
+  "d": 2.12,
+  "spans": 1,
+  "said": 0.51
+ },
+ {
+  "spk": "FRIEND",
+  "text": "Nobody loses this much without doing something wrong. Maybe God is punishing you.",
+  "t": 96.54,
+  "d": 7.7,
+  "spans": 3,
+  "said": 6.07
+ },
+ {
+  "spk": "MAN",
+  "text": "You think I haven't asked myself that question a thousand times?",
+  "t": 104.24,
+  "d": 4.15,
+  "spans": 1,
+  "said": 2.64
+ },
+ {
+  "spk": "FRIEND",
+  "text": "Then maybe you should figure out what you did.",
+  "t": 108.39,
+  "d": 2.73,
+  "spans": 1,
+  "said": 1.65
+ },
+ {
+  "spk": "MAN",
+  "text": "I spent my entire life believing that if I did good, good things would happen to me. Now I don't even know what to believe.",
+  "t": 111.12,
+  "d": 9.73,
+  "spans": 3,
+  "said": 8.27
+ },
+ {
+  "spk": "FRIEND",
+  "text": "So you still believe in God?",
+  "t": 120.85,
+  "d": 2.75,
+  "spans": 1,
+  "said": 1.27
+ },
+ {
+  "spk": "MAN",
+  "text": "I don't understand Him right now. I'm angry. I'm broken. I have questions I'll probably never get answers to.",
+  "t": 123.6,
+  "d": 9.81,
+  "spans": 4,
+  "said": 8.6
+ },
+ {
+  "spk": "FRIEND",
+  "text": "Then why keep believing?",
+  "t": 133.41,
+  "d": 2.18,
+  "spans": 1,
+  "said": 0.86
+ },
+ {
+  "spk": "MAN",
+  "text": "Because I never worshiped God for the money He gave me.",
+  "t": 135.59,
+  "d": 3.58,
+  "spans": 1,
+  "said": 2.12
+ },
+ {
+  "spk": "FRIEND",
+  "text": "But He let you lose everything.",
+  "t": 139.18,
+  "d": 2.65,
+  "spans": 1,
+  "said": 1.43
+ },
+ {
+  "spk": "MAN",
+  "text": "I know. And I may never understand why.",
+  "t": 141.83,
+  "d": 3.94,
+  "spans": 2,
+  "said": 3.11
+ },
+ {
+  "spk": "FRIEND",
+  "text": "So what's left?",
+  "t": 145.77,
+  "d": 1.43,
+  "spans": 1,
+  "said": 0.38
+ },
+ {
+  "spk": "MAN",
+  "text": "My faith. My memories of my son. The love I still have for my family. And the choice of what kind of man I become after all this.",
+  "t": 147.2,
+  "d": 9.46,
+  "spans": 3,
+  "said": 8.21
+ },
+ {
+  "spk": "FRIEND",
+  "text": "You really think you can start over?",
+  "t": 156.66,
+  "d": 3.29,
+  "spans": 1,
+  "said": 1.77
+ },
+ {
+  "spk": "MAN",
+  "text": "I don't know if I'll ever have another million dollars. And no amount of money will ever bring my son back.",
+  "t": 159.95,
+  "d": 7.55,
+  "spans": 2,
+  "said": 6.01
+ },
+ {
+  "spk": "FRIEND",
+  "text": "Then what are you going to do?",
+  "t": 167.5,
+  "d": 3.53,
+  "spans": 2,
+  "said": 3.06
+ },
+ {
+  "spk": "MAN",
+  "text": "Tomorrow, I'm going to get up. I'm going to help my wife through another day. I'm going to take whatever work I can find. And I'm going to keep trusting God, even when I don't understand Him.",
+  "t": 171.03,
+  "d": 14.88,
+  "spans": 6,
+  "said": 13.3
+ },
+ {
+  "spk": "FRIEND",
+  "text": "I don't think I could do that.",
+  "t": 185.91,
+  "d": 2.48,
+  "spans": 1,
+  "said": 0.99
+ },
+ {
+  "spk": "MAN",
+  "text": "Neither did I, until I had no other choice.",
+  "t": 188.39,
+  "d": 3.31,
+  "spans": 1,
+  "said": 1.88
+ },
+ {
+  "spk": "FRIEND",
+  "text": "You know, I always thought you were blessed because you were rich.",
+  "t": 191.7,
+  "d": 4.67,
+  "spans": 2,
+  "said": 3.12
+ },
+ {
+  "spk": "MAN",
+  "text": "So did I. But maybe I was confusing blessings with possessions.",
+  "t": 196.36,
+  "d": 4.51,
+  "spans": 2,
+  "said": 3.55
+ },
+ {
+  "spk": "FRIEND",
+  "text": "What do you mean?",
+  "t": 200.88,
+  "d": 2.01,
+  "spans": 2,
+  "said": 1.73
+ },
+ {
+  "spk": "MAN",
+  "text": "I thought having everything meant I had God's favor. Now I'm learning that losing everything doesn't mean I've lost His love.",
+  "t": 202.89,
+  "d": 7.32,
+  "spans": 2,
+  "said": 6.51
+ },
+ {
+  "spk": "NARRATOR",
+  "text": "And that's the lesson. Faith isn't proven when you have everything you want. It's tested when everything you depended on is taken away. Because the true measure of a man isn't what he owns when life is good, but who he chooses to become when life falls apart.",
+  "t": 210.2,
+  "d": 18.08,
+  "spans": 9,
+  "said": 17.67
+ }
+]
