@@ -1,0 +1,1553 @@
+<title>You Are the Man</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<!-- Layout: full-bleed WebGL stage, subtitle band floating low, minimal transport bar pinned to the bottom edge. Single committed dark theme — the piece is a dim bar at closing time. -->
+<style>
+  :root {
+    /* Color — bar at last call: smoke neutrals biased warm, amber practicals, cold blue for the grief passage */
+    --void: #0b0a0d;
+    --smoke: #171419;
+    --smoke-hi: #251f27;
+    --amber: #e8a24c;
+    --amber-dim: #8a5f2c;
+    --cold: #6f90c4;
+    --bone: #efe6dc;
+    --bone-dim: #9a9189;
+
+    /* Type — Bitter for spoken lines (slab serif, reads as dialogue on a card), Archivo for the UI chrome */
+    --face-line: "Bitter", Georgia, "Times New Roman", serif;
+    --face-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--void);
+    color: var(--bone);
+    font-family: var(--face-ui);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Grain + vignette sit over the render to kill WebGL's plasticky cleanliness */
+  #grade {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 78% 68% at 50% 46%, transparent 38%, rgba(6,5,8,0.55) 82%, rgba(4,3,6,0.9) 100%);
+    mix-blend-mode: multiply;
+  }
+  #grain {
+    position: fixed;
+    inset: -50%;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: var(--noise);
+    animation: drift 0.7s steps(3) infinite;
+  }
+  @keyframes drift {
+    0%   { transform: translate(0, 0); }
+    33%  { transform: translate(-1.5%, 1%); }
+    66%  { transform: translate(1%, -1.5%); }
+    100% { transform: translate(0, 0); }
+  }
+
+  /* ---- Subtitle band ---- */
+  #caption-wrap {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  #caption {
+    max-width: 30rem;
+    text-align: center;
+    font-family: var(--face-line);
+    font-size: clamp(1.02rem, 3.3vw, 1.4rem);
+    line-height: 1.42;
+    text-wrap: balance;
+    opacity: 0;
+    transition: opacity 420ms ease;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.95), 0 0 42px rgba(0,0,0,0.8);
+  }
+  #caption.on { opacity: 1; }
+  #caption .who {
+    display: block;
+    font-family: var(--face-ui);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 0.55em;
+    opacity: 0.72;
+  }
+  #caption.atheist .who { color: var(--cold); }
+  #caption.pastor  .who { color: var(--amber); }
+
+  /* ---- Transport ---- */
+  #bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding-block: 0.7rem;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, rgba(8,7,10,0.94), rgba(8,7,10,0.0));
+    opacity: 0.28;
+    transition: opacity 260ms ease;
+  }
+  #bar:hover, #bar:focus-within, #bar.show { opacity: 1; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid rgba(239,230,220,0.17);
+    background: rgba(239,230,220,0.05);
+    color: var(--bone);
+    font-family: var(--face-ui);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 0.8rem;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+  .btn:hover { background: rgba(239,230,220,0.12); border-color: rgba(239,230,220,0.3); }
+  .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  #scrub {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 2px;
+    background: rgba(239,230,220,0.14);
+    position: relative;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+  }
+  #scrub::after {
+    content: "";
+    position: absolute;
+    inset: -11px 0;
+  }
+  #fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: var(--amber);
+  }
+  #clock {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--bone-dim);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+  }
+
+  /* ---- Title card ---- */
+  #title {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.6rem;
+    text-align: center;
+    background: radial-gradient(ellipse at 50% 50%, #15121a 0%, #09080b 70%);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    transition: opacity 900ms ease;
+    z-index: 5;
+  }
+  #title.gone { opacity: 0; pointer-events: none; }
+  #title h1 {
+    margin: 0;
+    font-family: var(--face-line);
+    font-weight: 400;
+    font-size: clamp(2.1rem, 9vw, 4.2rem);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    color: var(--bone);
+  }
+  #title h1 em {
+    display: block;
+    font-style: normal;
+    font-size: 0.3em;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin-bottom: 1.1em;
+    font-family: var(--face-ui);
+    font-weight: 600;
+  }
+  #title p {
+    margin: 0;
+    max-width: 23rem;
+    color: var(--bone-dim);
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+  #play {
+    font-size: 0.8rem;
+    padding: 0.8rem 1.9rem;
+    border-color: rgba(232,162,76,0.45);
+    color: var(--amber);
+  }
+  #play:hover { background: rgba(232,162,76,0.14); border-color: var(--amber); }
+
+  #loading {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+    opacity: 0.8;
+  }
+  #loading[hidden] { display: none !important; }
+
+  #end {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.3rem;
+    text-align: center;
+    background: rgba(9,8,11,0.93);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    z-index: 6;
+  }
+  #end.on { display: flex; }
+  #end p {
+    margin: 0;
+    font-family: var(--face-line);
+    font-size: clamp(1rem, 3.4vw, 1.3rem);
+    line-height: 1.5;
+    max-width: 27rem;
+    color: var(--bone);
+    text-wrap: balance;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #grain { animation: none; }
+  }
+</style>
+
+<audio id="voice" preload="auto"></audio>
+<canvas id="stage"></canvas>
+<div id="grade"></div>
+<div id="grain"></div>
+
+<div id="caption-wrap"><div id="caption"><span class="who"></span><span class="line"></span></div></div>
+
+<div id="bar" hidden>
+  <button class="btn" id="toggle" aria-label="Play or pause">Pause</button>
+  <button class="btn" id="back" aria-label="Back ten seconds">&minus;10s</button>
+  <div id="scrub" role="slider" tabindex="0" aria-label="Scrub timeline" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="fill"></div></div>
+  <span id="clock">0:00 / 0:00</span>
+</div>
+
+<div id="title" hidden>
+  <h1><em>A short film</em>Two Fathers</h1>
+  <p>An atheist and a pastor at closing time. Five minutes, no narration read aloud &mdash; the lines appear as they are spoken.</p>
+  <button class="btn" id="play">Begin</button>
+  <span id="loading">Loading narration&hellip;</span>
+</div>
+
+<div id="end">
+  <p>Sometimes the deepest conversations about God don't end with someone winning an argument.</p>
+  <button class="btn" id="again">Play again</button>
+</div>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,400;0,500;1,400&family=Archivo:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- film grain as a data URI (CSP blocks external images) ----------
+  (function makeNoise() {
+    var n = document.createElement("canvas");
+    n.width = n.height = 120;
+    var c = n.getContext("2d");
+    var img = c.createImageData(120, 120);
+    for (var i = 0; i < img.data.length; i += 4) {
+      var v = (Math.random() * 255) | 0;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+    c.putImageData(img, 0, 0);
+    document.documentElement.style.setProperty("--noise", "url(" + n.toDataURL() + ")");
+  })();
+
+  var AUDIO_SRC = "";
+  var THREE = window.THREE;
+  if (!THREE) return;
+
+  // =====================================================================
+  //  SCENE
+  // =====================================================================
+  var canvas = document.getElementById("stage");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setClearColor(0x0b0a0d, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0d0b10, 7, 26);
+
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 120);
+
+  // Low-poly look: flat shading everywhere, no textures, chunky facets.
+  function mat(hex, opts) {
+    opts = opts || {};
+    return new THREE.MeshLambertMaterial({
+      color: hex,
+      flatShading: true,
+      transparent: !!opts.transparent,
+      opacity: opts.opacity === undefined ? 1 : opts.opacity,
+      side: opts.side || THREE.FrontSide
+    });
+  }
+
+  var PAL = {
+    wood:      0x4a3528,
+    woodDark:  0x2e2018,
+    woodLight: 0x6d5038,
+    wall:      0x2a2520,
+    floor:     0x211d1a,
+    skinA:     0xb3794f,   // Nathan
+    skinB:     0xc08a5e,   // David
+    shirtA:    0x6d6150,   // Nathan: undyed wool
+    shirtB:    0x4a2340,   // David: Tyrian purple
+    collar:    0xd9cdb8,
+    hairA:     0x6b6259,   // Nathan: grey
+    hairB:     0x33261d,   // David: dark
+    whiskey:   0x7a2f2f,   // wine in the king's cup
+    water:     0x9fc4d8,
+    glass:     0xc9a74e,   // beaten gold
+    brass:     0xb98a3e,
+    bottleA:   0x5c3b1e,
+    bottleB:   0x2f4336,
+    bottleC:   0x6a2c2c,
+    photo:     0xe3d8c6,
+    stone:     0x3b352e,
+    stoneLit:  0x554b3f,
+    gold:      0xc9a74e,
+    ember:     0xe0762a
+  };
+
+  // ---------------------------------------------------------------- lighting
+  var ambient = new THREE.HemisphereLight(0x4a4258, 0x16111c, 1.05);
+  scene.add(ambient);
+
+  // Three pendant practicals over the bar; each has a visible bulb + light.
+  var pendants = [];
+  [-2.6, 0, 2.6].forEach(function (x, i) {
+    var g = new THREE.Group();
+    var cord = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.5, 4), mat(0x151014));
+    cord.position.y = 0.75;
+    g.add(cord);
+    var shade = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 7, 1, true), mat(0x3a2b22, { side: THREE.DoubleSide }));
+    shade.position.y = -0.08;
+    g.add(shade);
+    var bulb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffd79a }));
+    bulb.position.y = -0.2;
+    g.add(bulb);
+    var pt = new THREE.PointLight(0xffb86a, 2.6, 14, 1.7);
+    pt.position.y = -0.24;
+    pt.castShadow = i === 1;
+    if (pt.shadow) {
+      pt.shadow.mapSize.set(1024, 1024);
+      pt.shadow.bias = -0.004;
+    }
+    g.add(pt);
+    g.position.set(x, 3.05, -0.1);
+    scene.add(g);
+    pendants.push({ group: g, light: pt, bulb: bulb, shade: shade, phase: i * 2.1, baseX: x });
+  });
+
+  // Key light on the two faces, plus a cold window wash that takes over later.
+  var key = new THREE.SpotLight(0xffc98a, 2.2, 22, 0.85, 0.5, 1.2);
+  key.position.set(0.6, 4.0, 3.4);
+  key.target.position.set(0, 1.45, -0.4);
+  scene.add(key, key.target);
+
+  var coldWash = new THREE.DirectionalLight(0x5f82bd, 0.0);
+  coldWash.position.set(-5, 3.4, 4.5);
+  scene.add(coldWash);
+
+  var neon = new THREE.PointLight(0xff4d6a, 0.5, 8, 2);
+  neon.position.set(-4.6, 2.4, -2.2);
+  scene.add(neon);
+
+  // =====================================================================
+  //  SET
+  // =====================================================================
+  var set = new THREE.Group();
+  scene.add(set);
+
+  // floor
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40, 1, 1), mat(PAL.floor));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  set.add(floor);
+
+  // back wall: dressed stone, laid in courses
+  var backWall = new THREE.Mesh(new THREE.PlaneGeometry(26, 9), mat(PAL.wall));
+  backWall.position.set(0, 4.5, -4.2);
+  backWall.receiveShadow = true;
+  set.add(backWall);
+
+  var bottles = [];   // kept: the ambient sway loop still reads this list
+  for (var cy = 0; cy < 5; cy++) {
+    for (var cx = 0; cx < 13; cx++) {
+      var block = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.62, 0.12),
+        mat(cy % 2 ? PAL.stone : PAL.stoneLit));
+      block.position.set(-10.4 + cx * 1.8 + (cy % 2) * 0.9, 0.5 + cy * 0.66, -4.1);
+      block.receiveShadow = true;
+      set.add(block);
+    }
+  }
+
+  // cedar beams across the ceiling
+  for (var bm = 0; bm < 6; bm++) {
+    var beam = new THREE.Mesh(new THREE.BoxGeometry(18, 0.3, 0.34), mat(PAL.woodDark));
+    beam.position.set(0, 4.25, -3.4 + bm * 1.5);
+    beam.castShadow = true;
+    set.add(beam);
+  }
+
+  // columns down both sides
+  for (var ci = 0; ci < 4; ci++) {
+    [-4.6, 4.6].forEach(function (cxp) {
+      var col = new THREE.Group();
+      var shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 4.1, 7), mat(PAL.stoneLit));
+      shaft.position.y = 2.05;
+      shaft.castShadow = true;
+      col.add(shaft);
+      var cap = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.26, 1.0), mat(PAL.stone));
+      cap.position.y = 4.2;
+      col.add(cap);
+      var base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.22, 0.95), mat(PAL.stone));
+      base.position.y = 0.11;
+      col.add(base);
+      col.position.set(cxp, 0, -2.6 + ci * 2.3);
+      set.add(col);
+    });
+  }
+
+  // the dais and the throne, on David's side
+  var dais = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 2.6), mat(PAL.stoneLit));
+  dais.position.set(0.95, 0.11, 0.1);
+  dais.receiveShadow = true;
+  set.add(dais);
+  var dais2 = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.2, 2.1), mat(PAL.stone));
+  dais2.position.set(0.95, 0.31, 0.1);
+  dais2.receiveShadow = true;
+  set.add(dais2);
+
+  var throne = new THREE.Group();
+  var tBack = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.5, 0.14), mat(PAL.wood));
+  tBack.position.set(0, 1.18, -0.42);
+  tBack.castShadow = true;
+  throne.add(tBack);
+  for (var ta = 0; ta < 2; ta++) {
+    var arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.72), mat(PAL.woodLight));
+    arm.position.set(ta ? 0.43 : -0.43, 0.84, -0.08);
+    throne.add(arm);
+    var fin = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.22, 5), mat(PAL.gold));
+    fin.position.set(ta ? 0.43 : -0.43, 1.98, -0.42);
+    throne.add(fin);
+  }
+  throne.position.set(0.72, 0, 0.5);
+  throne.rotation.y = -0.3;
+  set.add(throne);
+
+  // banners hung between the columns
+  for (var bi = 0; bi < 3; bi++) {
+    var ban = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 2.3),
+      mat(bi % 2 ? PAL.shirtB : PAL.wood, { side: THREE.DoubleSide }));
+    ban.position.set(-3.3 + bi * 3.3, 2.5, -4.0);
+    set.add(ban);
+  }
+
+  // a low table with the king's cup
+  var tableG = new THREE.Group();
+  var ttop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.6), mat(PAL.woodLight));
+  ttop.position.y = 0.52;
+  ttop.castShadow = true;
+  tableG.add(ttop);
+  for (var tl = 0; tl < 4; tl++) {
+    var tleg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.52, 5), mat(PAL.woodDark));
+    tleg.position.set(tl < 2 ? -0.45 : 0.45, 0.26, tl % 2 ? -0.22 : 0.22);
+    tableG.add(tleg);
+  }
+  tableG.position.set(1.95, 0, 1.05);
+  tableG.rotation.y = -0.4;
+  set.add(tableG);
+
+  // =====================================================================
+  //  CHARACTER RIG  (low-poly, jointed, built for continuous motion)
+  // =====================================================================
+  function buildPerson(cfg) {
+    var P = new THREE.Group();
+    var skin = mat(cfg.skin);
+    var cloth = mat(cfg.shirt);
+
+    // --- stool ---
+    var stool = new THREE.Group();
+    var seat = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.09, 8), mat(PAL.woodDark));
+    seat.position.y = 0.78;
+    seat.castShadow = true;
+    stool.add(seat);
+    for (var l = 0; l < 4; l++) {
+      var stoolLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.78, 5), mat(0x241a14));
+      var a = (l / 4) * Math.PI * 2 + 0.4;
+      stoolLeg.position.set(Math.cos(a) * 0.2, 0.39, Math.sin(a) * 0.2);
+      stoolLeg.rotation.set(Math.sin(a) * 0.1, 0, -Math.cos(a) * 0.1);
+      stool.add(stoolLeg);
+    }
+    P.add(stool);
+
+    // --- hips / torso / chest stack (each a joint we can animate) ---
+    var hips = new THREE.Group();
+    hips.position.y = 0.86;
+    P.add(hips);
+
+    var torso = new THREE.Group();
+    hips.add(torso);
+
+    var pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.26), cloth);
+    pelvis.position.y = 0.09;
+    pelvis.castShadow = true;
+    torso.add(pelvis);
+
+    var chest = new THREE.Group();
+    chest.position.y = 0.2;
+    torso.add(chest);
+
+    var chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.5, 0.3), cloth);
+    chestMesh.position.y = 0.25;
+    chestMesh.castShadow = true;
+    chest.add(chestMesh);
+
+    // shoulder bevel so the silhouette isn't a plain box
+    var shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.3), cloth);
+    shoulders.position.y = 0.46;
+    shoulders.castShadow = true;
+    chest.add(shoulders);
+
+    // clerical collar / open shirt collar
+    if (cfg.collar) {
+      var cl = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.125, 0.07, 8), mat(PAL.collar));
+      cl.position.y = 0.48;
+      chest.add(cl);
+      var tab = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.02), mat(PAL.collar));
+      tab.position.set(0, 0.43, 0.15);
+      chest.add(tab);
+    } else {
+      var v = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, 0.02), mat(cfg.skin));
+      v.position.set(0, 0.42, 0.16);
+      chest.add(v);
+    }
+
+    // --- neck + head ---
+    var neckJ = new THREE.Group();
+    neckJ.position.y = 0.48;
+    chest.add(neckJ);
+    var neckM = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.092, 0.2, 6), skin);
+    neckM.position.y = 0.07;
+    neckJ.add(neckM);
+
+    var head = new THREE.Group();
+    head.position.y = 0.12;
+    neckJ.add(head);
+
+    // faceted skull
+    var skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.215, 1), skin);
+    skull.scale.set(0.95, 1.08, 1.0);
+    skull.position.y = 0.13;
+    skull.castShadow = true;
+    head.add(skull);
+
+    // jaw — animates on every spoken syllable
+    var jaw = new THREE.Group();
+    jaw.position.set(0, 0.1, 0.02);
+    head.add(jaw);
+    var jawM = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.11, 0.2), skin);
+    jawM.position.set(0, -0.04, 0.03);
+    jaw.add(jawM);
+    var mouth = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.022, 0.03), mat(0x4a2420));
+    mouth.position.set(0, -0.055, 0.155);
+    jaw.add(mouth);
+
+    // nose
+    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.1, 4), skin);
+    nose.rotation.x = Math.PI / 2;
+    nose.position.set(0, 0.16, 0.2);
+    head.add(nose);
+
+    // brows — the main emotional control on a low-poly face
+    var browL = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.016, 0.022), mat(cfg.hair));
+    browL.position.set(-0.072, 0.262, 0.182);
+    head.add(browL);
+    var browR = browL.clone();
+    browR.position.x = 0.075;
+    head.add(browR);
+
+    // eyes: white + pupil + a lid that can blink and narrow
+    function eye(sx) {
+      var g = new THREE.Group();
+      var w = new THREE.Mesh(new THREE.SphereGeometry(0.044, 8, 6), mat(0xf2ece4));
+      g.add(w);
+      var p = new THREE.Mesh(new THREE.SphereGeometry(0.021, 6, 5), mat(0x241c1a));
+      p.position.z = 0.032;
+      g.add(p);
+      var lid = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.05, 0.05), skin);
+      lid.position.set(0, 0.062, 0.014);
+      g.add(lid);
+      g.position.set(sx, 0.195, 0.165);
+      head.add(g);
+      return { group: g, pupil: p, lid: lid };
+    }
+    var eyeL = eye(-0.075);
+    var eyeR = eye(0.075);
+
+    // hair cap
+    var hair = new THREE.Mesh(new THREE.IcosahedronGeometry(0.228, 1), mat(cfg.hair));
+    hair.scale.set(0.95, 0.78, 1.0);
+    hair.position.set(0, 0.255, -0.015);
+    hair.castShadow = true;
+    head.add(hair);
+
+    // --- arms: shoulder + elbow joints so hands can reach the glass ---
+    function arm(side) {
+      var sh = new THREE.Group();
+      sh.position.set(side * 0.3, 0.42, 0);
+      chest.add(sh);
+      var upper = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.3, 0.125), cloth);
+      upper.position.y = -0.15;
+      upper.castShadow = true;
+      sh.add(upper);
+
+      var el = new THREE.Group();
+      el.position.y = -0.3;
+      sh.add(el);
+      var fore = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.28, 0.1), cloth);
+      fore.position.y = -0.14;
+      fore.castShadow = true;
+      el.add(fore);
+
+      var hand = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), skin);
+      hand.position.y = -0.31;
+      hand.castShadow = true;
+      el.add(hand);
+
+      sh.rotation.z = side * 0.14;
+      el.rotation.x = -0.5;
+      return { shoulder: sh, elbow: el, hand: hand, side: side };
+    }
+    var armL = arm(-1);
+    var armR = arm(1);
+
+    // legs — hooked over the stool rail, with a foot that taps
+    function leg(side) {
+      var hp = new THREE.Group();
+      hp.position.set(side * 0.14, 0.02, 0.04);
+      hips.add(hp);
+      var thigh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.34, 0.15), mat(cfg.pants || cfg.shirt));
+      thigh.position.set(0, -0.17, 0.0);
+      hp.add(thigh);
+      var kn = new THREE.Group();
+      kn.position.y = -0.34;
+      hp.add(kn);
+      var shin = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.34, 0.13), mat(cfg.pants || cfg.shirt));
+      shin.position.y = -0.17;
+      kn.add(shin);
+      var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.09, 0.26), mat(0x191316));
+      shoe.position.set(0, -0.37, 0.05);
+      kn.add(shoe);
+      hp.rotation.x = 0.55;
+      kn.rotation.x = -0.75;
+      return { hip: hp, knee: kn };
+    }
+    var legL = leg(-1);
+    var legR = leg(1);
+
+    return {
+      root: P, hips: hips, torso: torso, chest: chest, neck: neckJ, head: head,
+      jaw: jaw, mouth: mouth, browL: browL, browR: browR,
+      eyeL: eyeL, eyeR: eyeR, armL: armL, armR: armR, legL: legL, legR: legR,
+      // animation state
+      blink: 0, nextBlink: 1 + Math.random() * 3,
+      talk: 0, emo: 0, slump: 0, lookAt: 0, breathPhase: Math.random() * 6
+    };
+  }
+
+  var atheist = buildPerson({ skin: PAL.skinA, shirt: PAL.shirtA, hair: PAL.hairA, pants: 0x232a33, collar: false });
+  var pastor  = buildPerson({ skin: PAL.skinB, shirt: PAL.shirtB, hair: PAL.hairB, pants: 0x17171b, collar: true });
+
+  atheist.root.position.set(-0.62, 0, 0.62);
+  atheist.root.rotation.y = 0.26;
+  pastor.root.position.set(0.72, 0, 0.62);
+  pastor.root.rotation.y = -0.3;
+  scene.add(atheist.root, pastor.root);
+
+  // ------------------------------------------------- props on the bar
+  // whiskey glass: liquid level drops across the film, and the surface sloshes
+  var whiskeyGlass = new THREE.Group();
+  var wGlassBody = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.07, 0.17, 8, 1, true),
+    mat(PAL.glass, { transparent: true, opacity: 0.26, side: THREE.DoubleSide }));
+  wGlassBody.position.y = 0.085;
+  whiskeyGlass.add(wGlassBody);
+  var wGlassBase = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.025, 8), mat(PAL.glass, { transparent: true, opacity: 0.4 }));
+  wGlassBase.position.y = 0.012;
+  whiskeyGlass.add(wGlassBase);
+  var whiskey = new THREE.Mesh(new THREE.CylinderGeometry(0.073, 0.066, 0.1, 8), mat(PAL.whiskey, { transparent: true, opacity: 0.88 }));
+  whiskey.position.y = 0.055;
+  whiskeyGlass.add(whiskey);
+  whiskeyGlass.position.set(-0.6, 1.16, -0.42);
+  set.add(whiskeyGlass);
+
+  // pastor's water
+  var waterGlass = new THREE.Group();
+  var waGlassBody = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.058, 0.22, 8, 1, true),
+    mat(PAL.glass, { transparent: true, opacity: 0.24, side: THREE.DoubleSide }));
+  waGlassBody.position.y = 0.11;
+  waterGlass.add(waGlassBody);
+  var water = new THREE.Mesh(new THREE.CylinderGeometry(0.061, 0.054, 0.15, 8), mat(PAL.water, { transparent: true, opacity: 0.62 }));
+  water.position.y = 0.078;
+  waterGlass.add(water);
+  waterGlass.position.set(0.74, 1.16, -0.42);
+  set.add(waterGlass);
+
+  // the photograph — the only object in the film with any detail
+  var photo = new THREE.Group();
+  var photoCard = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.28, 0.006), mat(PAL.photo));
+  photo.add(photoCard);
+  var photoImg = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.2), mat(0x7d8da0));
+  photoImg.position.set(0, 0.022, 0.005);
+  photo.add(photoImg);
+  // a boy's shape, implied in three facets
+  var boyHead = new THREE.Mesh(new THREE.IcosahedronGeometry(0.03, 0), mat(0xd9ab86));
+  boyHead.position.set(0, 0.055, 0.009);
+  photo.add(boyHead);
+  var boyBody = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.08, 5), mat(0x5e7a52));
+  boyBody.position.set(0, -0.005, 0.009);
+  photo.add(boyBody);
+  photo.position.set(0.74, 1.17, -0.3);
+  photo.rotation.x = -Math.PI / 2;
+  photo.visible = false;
+  set.add(photo);
+
+  // bartender — moves in the deep background the whole time
+  var bartender = new THREE.Group();
+  var btBody = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.62, 0.26), mat(0x2a2630));
+  btBody.position.y = 1.0;
+  bartender.add(btBody);
+  var btHead = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 1), mat(0xb5805c));
+  btHead.position.y = 1.44;
+  bartender.add(btHead);
+  var btArmL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.42, 0.09), mat(0x2a2630));
+  btArmL.position.set(-0.26, 0.98, 0.04);
+  bartender.add(btArmL);
+  var btArmR = btArmL.clone();
+  btArmR.position.x = 0.26;
+  bartender.add(btArmR);
+  bartender.position.set(-2.4, 0, -2.3);
+  set.add(bartender);
+
+  // dust motes in the light beams — constant drift, never still
+  var dustCount = 420;
+  var dustGeo = new THREE.BufferGeometry();
+  var dustPos = new Float32Array(dustCount * 3);
+  var dustSeed = [];
+  for (var d = 0; d < dustCount; d++) {
+    dustPos[d * 3]     = (Math.random() - 0.5) * 11;
+    dustPos[d * 3 + 1] = Math.random() * 3.2 + 0.3;
+    dustPos[d * 3 + 2] = (Math.random() - 0.5) * 6 - 0.5;
+    dustSeed.push({ sp: 0.1 + Math.random() * 0.3, ph: Math.random() * 8, amp: 0.3 + Math.random() * 0.7 });
+  }
+  dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+  var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+    color: 0xffd3a0, size: 0.022, transparent: true, opacity: 0.5, sizeAttenuation: true
+  }));
+  scene.add(dust);
+
+  // =====================================================================
+  //  SCRIPT  — every beat has a camera, a lighting mood, and an action
+  // =====================================================================
+  // spk: "a" atheist | "p" pastor | "n" narration
+  // cam: shot name (see SHOTS)
+  // act: optional action tag fired once when the beat starts
+var BEATS = [
+    { t:0.00, d:4.16, spk:"n", text:"My king, I have come to tell you about a terrible injustice.", cam:"wide", mood:"lamp" },
+    { t:4.16, d:1.67, spk:"d", text:"Speak, Nathan. What has happened?", cam:"cuD", mood:"lamp" },
+    { t:5.83, d:5.15, spk:"n", text:"There were two men living in the same city. One was rich, and the other was poor.", cam:"cuN", mood:"lamp", act:"tell" },
+    { t:10.98, d:0.42, spk:"d", text:"Go on.", cam:"cuD", mood:"lamp" },
+    { t:11.40, d:7.48, spk:"n", text:"The rich man owned hundreds of sheep and cattle. More than he could ever need. But the poor man had only one little lamb.", cam:"cuN", mood:"lamp", act:"tell" },
+    { t:18.89, d:0.63, spk:"d", text:"Only one?", cam:"cuD", mood:"lamp", act:"lean" },
+    { t:19.51, d:11.73, spk:"n", text:"Yes, my king. He raised that lamb from birth. He fed it from his own plate, let it drink from his cup, and held it in his arms as it slept. He loved that lamb as though it were his own daughter.", cam:"cuN", mood:"lamp", act:"tender" },
+    { t:31.25, d:2.18, spk:"d", text:"And what happened to this man?", cam:"cuD", mood:"lamp", act:"lean" },
+    { t:33.42, d:14.51, spk:"n", text:"One day, a traveler came to visit the rich man. Rather than slaughter one of his own sheep to prepare a meal, the rich man went to the poor man's home, took his only lamb, and killed it to feed his guest.", cam:"cuN", mood:"lamp", act:"tell" },
+    { t:47.94, d:3.93, spk:"d", text:"What? He had hundreds of sheep, yet he took the poor man's only lamb?", cam:"cuD", mood:"hot", act:"anger" },
+    { t:51.86, d:1.67, spk:"n", text:"That is exactly what he did.", cam:"cuN", mood:"lamp" },
+    { t:53.54, d:11.34, spk:"d", text:"As surely as the Lord lives, that man deserves to die! He must repay the poor man four times over! How could anyone be so heartless?", cam:"twoD", mood:"hot", act:"rage" },
+    { t:64.88, d:1.49, spk:"n", text:"You are the man.", cam:"cuN", mood:"cold", act:"accuse" },
+    { t:66.37, d:1.05, spk:"d", text:"What did you just say?", cam:"cuD", mood:"cold", act:"freeze" },
+    { t:67.42, d:1.26, spk:"n", text:"You are the man, David.", cam:"cuN", mood:"cold", act:"accuse" },
+    { t:68.67, d:2.09, spk:"d", text:"Nathan, explain yourself.", cam:"cuD", mood:"cold" },
+    { t:70.76, d:11.87, spk:"n", text:"The Lord made you king over Israel. He protected you from Saul. He gave you wealth, power, and a kingdom. And if that had not been enough, He would have given you even more.", cam:"twoN", mood:"cold", act:"tell" },
+    { t:82.63, d:2.35, spk:"d", text:"What does this have to do with me?", cam:"cuD", mood:"cold" },
+    { t:84.98, d:10.90, spk:"n", text:"You took Bathsheba, the wife of Uriah, to be your own. And you arranged for Uriah to be killed by the sword of the Ammonites.", cam:"cuN", mood:"cold", act:"accuse" },
+    { t:95.88, d:0.42, spk:"d", text:"Nathan...", cam:"cuD", mood:"cold", act:"falter" },
+    { t:96.30, d:8.42, spk:"n", text:"You had everything, David. Yet you took from a man who had far less than you. Just like the rich man took the poor man's lamb.", cam:"cuN", mood:"cold", act:"tell" },
+    { t:104.72, d:3.20, spk:"d", text:"I... I have sinned against the Lord.", cam:"cuD", mood:"low", act:"break" },
+    { t:107.92, d:10.76, spk:"n", text:"The Lord has forgiven your sin, David. You will not die. But your actions will bring suffering upon your household. The consequences will not simply disappear.", cam:"cuN", mood:"low", act:"tender" },
+    { t:118.68, d:2.61, spk:"d", text:"I thought I had hidden what I had done.", cam:"cuD", mood:"low", act:"headDown" },
+    { t:121.29, d:4.34, spk:"n", text:"You may hide your actions from men, David, but you cannot hide your heart from God.", cam:"cuN", mood:"low", act:"tell" },
+    { t:125.63, d:2.11, spk:"d", text:"Then may God have mercy on me.", cam:"cuD", mood:"low", act:"kneel" },
+    { t:127.74, d:10.41, spk:"n", text:"Remember this, my king. It is easy to condemn wickedness when we see it in others. But a wise man must first have the courage to recognize it in himself.", cam:"cuN", mood:"warm", act:"tender" },
+    { t:138.15, d:4.73, spk:"d", text:"Today, I judged another man for the very evil I had committed.", cam:"cuD", mood:"warm", act:"headDown" },
+    { t:142.88, d:11.86, spk:"n", text:"And that is the lesson, David. Before you judge the sins of another, examine your own heart. For sometimes, the person you condemn most harshly is the very person you have become.", cam:"wide", mood:"warm", act:"tell" },
+  ];
+
+  var DURATION = 155.25;
+
+  // ---------------------------------------------------------------- shots
+  // Every shot holds a slow drift so the camera is never locked off.
+  var SHOTS = {
+    wide:        { pos:[0.1, 2.15, 6.2],   look:[0.05, 1.45, 0.3],  fov:40, drift:[0.5, 0.16, 0.10] },
+    wideSlow:    { pos:[-1.8, 2.05, 5.6],  look:[0.05, 1.45, 0.3],  fov:38, drift:[0.22, 0.1, 0.05] },
+    hall:        { pos:[0.05, 1.85, 3.6],  look:[0.05, 1.35, -0.2], fov:38, drift:[0.4, 0.14, 0.12] },
+    twoN:        { pos:[-2.5, 1.85, 3.5],  look:[0.15, 1.55, 0.45], fov:36, drift:[0.35, 0.12, 0.08] },
+    twoD:        { pos:[2.6, 1.88, 3.4],   look:[-0.1, 1.55, 0.45], fov:36, drift:[0.35, 0.12, 0.08] },
+    cuN:         { pos:[1.25, 1.80, 3.05], look:[-0.62, 1.70, 0.62],fov:26, drift:[0.2, 0.09, 0.05] },
+    cuNtight:    { pos:[0.75, 1.78, 2.62], look:[-0.62, 1.70, 0.62],fov:23, drift:[0.12, 0.06, 0.03] },
+    cuD:         { pos:[-1.05, 1.82, 3.1], look:[0.72, 1.70, 0.62], fov:26, drift:[0.2, 0.09, 0.05] },
+    cuDtight:    { pos:[-0.6, 1.80, 2.68], look:[0.72, 1.70, 0.62], fov:23, drift:[0.12, 0.06, 0.03] },
+    throne:      { pos:[-0.3, 1.84, 2.95], look:[0.72, 1.68, 0.62], fov:30, drift:[0.18, 0.07, 0.06] },
+    accuse:      { pos:[-0.45, 1.78, 2.45],look:[0.72, 1.72, 0.62], fov:24, drift:[0.1, 0.05, 0.04] },
+    lowD:        { pos:[-0.5, 1.30, 2.6],  look:[0.72, 1.74, 0.62], fov:30, drift:[0.14, 0.07, 0.05] },
+    handsD:      { pos:[0.1, 1.72, 2.5],   look:[0.4, 1.22, -0.15], fov:30, drift:[0.18, 0.07, 0.06] },
+    overN:       { pos:[-1.6, 2.15, 2.5],  look:[0.72, 1.55, 0.62], fov:34, drift:[0.25, 0.1, 0.07] },
+    finalWide:   { pos:[0.2, 2.45, 7.2],   look:[0.05, 1.45, 0.3],  fov:40, drift:[0.5, 0.2, 0.14] }
+  };
+
+  var MOODS = {
+    lamp:    { pend: 2.5, key: 2.1, cold: 0.08, amb: 1.02, neon: 0.46, fogN: 9.0, fogF: 34 },
+    hot:     { pend: 3.0, key: 2.5, cold: 0.04, amb: 1.12, neon: 0.6,  fogN: 9.5, fogF: 36 },
+    cold:    { pend: 1.5, key: 1.25, cold: 0.78, amb: 0.72, neon: 0.22, fogN: 6.2, fogF: 24 },
+    low:     { pend: 1.15, key: 0.95, cold: 0.62, amb: 0.6, neon: 0.16, fogN: 5.4, fogF: 21 },
+    warm:    { pend: 2.2, key: 1.85, cold: 0.14, amb: 0.95, neon: 0.4,  fogN: 8.2, fogF: 31 }
+  };
+
+  // =====================================================================
+  //  PLAYBACK STATE
+  // =====================================================================
+  var clock = new THREE.Clock();
+  var time = 0;
+  var playing = false;
+  var voice = document.getElementById("voice");
+  voice.src = AUDIO_SRC;
+  var audioReady = false;
+  var beatIdx = -1;
+  var curShot = SHOTS.wide;
+  var prevShot = SHOTS.wide;
+  var shotT = 1;          // 0..1 blend between prevShot and curShot
+  var shotStart = 0;
+  var mood = Object.assign({}, MOODS.warm);
+  var targetMood = MOODS.warm;
+
+  // per-character animation targets, eased every frame
+  var A = { lean: 0, slump: 0, headDown: 0, headTurn: 0, brow: 0, smirk: 0, handUp: 0, wipe: 0, stand: 0, away: 0, prayPose: 0, laugh: 0 };
+  var P = { lean: 0, slump: 0, headDown: 0, headTurn: 0, brow: 0, smile: 0, handUp: 0, reach: 0, cry: 0, holdPhoto: 0 };
+
+  var whiskeyLevel = 1.0;    // drains over the film
+  var atheistTalking = 0;
+  var pastorTalking = 0;
+  var photoOut = 0;
+  var doorOpen = 0;
+  var bartenderClosing = 0;
+
+  // ------------------------------------------------------------- actions
+  function fireAction(tag) {
+    switch (tag) {
+      case "tell":     A.handUp = 0.35; A.lean = 0.15; A.brow = 0; break;
+      case "tender":   A.handUp = 0.2; A.lean = 0.1; A.brow = 0.25; break;
+      case "accuse":   A.handUp = 1; A.lean = 0.8; A.brow = -0.8; A.headTurn = 0; break;
+      case "lean":     P.lean = 0.7; P.brow = 0.2; break;
+      case "anger":    P.lean = 1; P.brow = -0.9; P.handUp = 0.8; break;
+      case "rage":     P.lean = 1; P.brow = -1; P.handUp = 1; P.smile = 0; break;
+      case "freeze":   P.lean = 0; P.brow = 0.9; P.handUp = 0; P.headTurn = 0; break;
+      case "falter":   P.lean = 0.1; P.brow = 0.4; P.headDown = 0.35; P.handUp = 0; break;
+      case "break":    P.slump = 1; P.headDown = 0.85; P.brow = -0.7; P.lean = 0; break;
+      case "headDown": P.headDown = 0.8; P.slump = 0.7; break;
+      case "kneel":    P.slump = 1; P.headDown = 1; P.cry = 0.6; P.reach = 0.4; break;
+    }
+  }
+
+  // ------------------------------------------------------------- captions
+  var capEl = document.getElementById("caption");
+  var capWho = capEl.querySelector(".who");
+  var capLine = capEl.querySelector(".line");
+  var NAMES = { n: "Nathan", d: "David" };
+
+  // The film carries itself on voice and picture - nothing is subtitled, so
+  // the frame stays clean. Beats keep their text: it drives timing and lip-sync.
+  function hasCaption(b) { return false; }
+
+  function showBeat(i) {
+    var b = BEATS[i];
+    if (!b) return;
+    if (!hasCaption(b)) { capEl.classList.remove("on"); return; }
+    capEl.className = "on " + (b.spk === "a" ? "atheist" : "pastor");
+    capWho.textContent = NAMES[b.spk];
+    capLine.textContent = b.text;
+  }
+
+  function enterBeat(i) {
+    var b = BEATS[i];
+    beatIdx = i;
+    showBeat(i);
+    if (b.cam && SHOTS[b.cam] && SHOTS[b.cam] !== curShot) {
+      prevShot = curShot;
+      curShot = SHOTS[b.cam];
+      shotT = 0;
+      shotStart = time;
+    }
+    if (b.mood && MOODS[b.mood]) targetMood = MOODS[b.mood];
+    if (b.act) fireAction(b.act);
+  }
+
+  // Rebuild state from scratch when scrubbing, so the rig never ends up
+  // holding a pose from a beat that no longer applies.
+  function seek(toTime) {
+    time = Math.max(0, Math.min(DURATION, toTime));
+    try { voice.currentTime = time; } catch (e) {}
+    A = { lean: 0, slump: 0, headDown: 0, headTurn: 0, brow: 0, smirk: 0, handUp: 0, wipe: 0, stand: 0, away: 0, prayPose: 0, laugh: 0 };
+    P = { lean: 0, slump: 0, headDown: 0, headTurn: 0, brow: 0, smile: 0, handUp: 0, reach: 0, cry: 0, holdPhoto: 0 };
+    whiskeyLevel = 1.0; photoOut = 0; doorOpen = 0; bartenderClosing = 0;
+    targetMood = MOODS.warm;
+    curShot = prevShot = SHOTS.wide;
+    shotT = 1;
+    var last = -1;
+    for (var i = 0; i < BEATS.length; i++) {
+      if (BEATS[i].t <= time) {
+        if (BEATS[i].act) fireAction(BEATS[i].act);
+        if (BEATS[i].mood && MOODS[BEATS[i].mood]) targetMood = MOODS[BEATS[i].mood];
+        if (BEATS[i].cam && SHOTS[BEATS[i].cam]) curShot = prevShot = SHOTS[BEATS[i].cam];
+        last = i;
+      } else break;
+    }
+    beatIdx = last;
+    mood = Object.assign({}, targetMood);
+    if (last >= 0) showBeat(last); else capEl.classList.remove("on");
+    document.getElementById("end").classList.remove("on");
+  }
+
+  // =====================================================================
+  //  PER-FRAME ANIMATION
+  // =====================================================================
+  function ease(cur, tgt, rate, dt) {
+    return cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+  }
+
+  function animatePerson(c, s, dt, t, talking, isAtheist) {
+    // ease every control toward its target
+    for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) {
+      c[k] = ease(c[k] || 0, s[k], 2.6, dt);
+    }
+
+    // --- breathing: always on, deeper when slumped/crying ---
+    var bp = t * 1.05 + c.breathPhase;
+    var depth = 0.012 + (c.slump || 0) * 0.014 + (c.cry || 0) * 0.02;
+    var breath = Math.sin(bp) * depth;
+    c.chest.scale.set(1 + breath * 0.8, 1 + breath, 1 + breath * 0.6);
+
+    // --- idle sway: tiny continuous weight shift, never static ---
+    var sway = Math.sin(t * 0.47 + c.breathPhase) * 0.016 + Math.sin(t * 0.31) * 0.009;
+    var sway2 = Math.cos(t * 0.39 + c.breathPhase * 1.3) * 0.013;
+
+    // --- posture ---
+    var lean = c.lean || 0, slump = c.slump || 0, stand = c.stand || 0, away = c.away || 0;
+    c.torso.rotation.x = lean * 0.2 + slump * 0.17 + breath * 0.5;
+    c.torso.rotation.z = sway;
+    c.hips.position.y = 0.86 + stand * 0.2 - slump * 0.035 + Math.sin(bp) * 0.004;
+    c.chest.rotation.z = sway2;
+
+    // walking away / returning: root slides toward the door
+    if (isAtheist) {
+      c.root.position.x = -0.62 + away * 4.2 + stand * 0.25;
+      c.root.position.z = 0.62 + away * 1.5;
+      c.root.rotation.y = 0.26 - away * 0.95;
+      // feet plant when standing
+      var step = stand > 0.3 ? Math.sin(t * 3.4) * 0.3 * away : 0;
+      c.legL.hip.rotation.x = 0.55 - stand * 0.5 + step;
+      c.legR.hip.rotation.x = 0.55 - stand * 0.5 - step;
+      c.legL.knee.rotation.x = -0.75 + stand * 0.6;
+      c.legR.knee.rotation.x = -0.75 + stand * 0.6;
+    } else {
+      c.legL.hip.rotation.x = 0.55 + Math.sin(t * 0.6) * 0.02;
+      c.legR.hip.rotation.x = 0.55 + Math.cos(t * 0.53) * 0.02;
+    }
+
+    // --- head: aim, plus constant micro-motion ---
+    var hd = c.headDown || 0, ht = c.headTurn || 0;
+    c.neck.rotation.x = hd * 0.3 - lean * 0.08 + Math.sin(t * 0.83 + 1.1) * 0.022;
+    c.neck.rotation.y = ht * 0.6 + Math.sin(t * 0.61) * 0.03;
+    c.neck.rotation.z = Math.sin(t * 0.71 + 2.2) * 0.018 + ht * 0.08;
+    c.head.rotation.x = hd * 0.1 + Math.sin(t * 1.17 + 0.4) * 0.016;
+    c.head.rotation.y = Math.sin(t * 0.93 + 1.7) * 0.025;
+
+    // --- blinking ---
+    c.nextBlink -= dt;
+    if (c.nextBlink <= 0) {
+      c.blink = 1;
+      // blinks come faster when upset
+      c.nextBlink = (0.9 + Math.random() * 3.2) * (1 - (c.cry || 0) * 0.55);
+    }
+    if (c.blink > 0) c.blink = Math.max(0, c.blink - dt * 7.5);
+    var lidDrop = c.blink * 0.062 + (c.cry || 0) * 0.012 + (c.slump || 0) * 0.006;
+    c.eyeL.lid.position.y = 0.062 - lidDrop;
+    c.eyeR.lid.position.y = 0.062 - lidDrop;
+
+    // --- eye darts: the eyes never sit perfectly still ---
+    var dartX = Math.sin(t * 1.9 + c.breathPhase) * 0.004 + Math.sin(t * 0.43) * 0.005;
+    var dartY = Math.cos(t * 1.37 + c.breathPhase) * 0.003;
+    c.eyeL.pupil.position.x = dartX - ht * 0.012;
+    c.eyeR.pupil.position.x = dartX - ht * 0.012;
+    c.eyeL.pupil.position.y = dartY - hd * 0.01;
+    c.eyeR.pupil.position.y = dartY - hd * 0.01;
+
+    // --- brows carry the emotion ---
+    var brow = c.brow || 0;
+    var browY = 0.262 + brow * 0.02;
+    var browTilt = -brow * 0.22 + (c.cry || 0) * 0.3;
+    c.browL.position.y = browY + (c.cry || 0) * 0.008;
+    c.browR.position.y = browY + (c.cry || 0) * 0.008;
+    c.browL.rotation.z = browTilt;
+    c.browR.rotation.z = -browTilt;
+
+    // --- jaw: driven by the talking envelope, plus a resting micro-open ---
+    var syl = Math.abs(Math.sin(t * 9.1)) * 0.55 + Math.abs(Math.sin(t * 13.7 + 1.2)) * 0.45;
+    var open = talking * syl * 0.19;
+    c.jaw.rotation.x = open + 0.012 + (c.laugh || 0) * Math.abs(Math.sin(t * 7)) * 0.1;
+    c.mouth.scale.y = 1 + open * 7 + (c.smirk || 0) * 0.5;
+    c.mouth.scale.x = 1 + (c.smile || 0) * 0.35 - open * 0.15;
+    c.mouth.position.x = (c.smirk || 0) * 0.014;
+    c.mouth.rotation.z = (c.smirk || 0) * 0.25 - (c.cry || 0) * 0.12;
+
+    // laughing shakes the whole chest
+    if (c.laugh > 0.01) {
+      c.torso.rotation.x += Math.sin(t * 7.2) * 0.035 * c.laugh;
+      c.neck.rotation.x += Math.sin(t * 7.2 + 0.5) * 0.05 * c.laugh;
+    }
+    // crying: slow shoulder shudder
+    if (c.cry > 0.3) {
+      c.chest.rotation.x = Math.sin(t * 2.1) * 0.02 * c.cry;
+      c.chest.position.y = 0.2 + Math.abs(Math.sin(t * 1.05)) * 0.006 * c.cry;
+    }
+
+    // --- arms ---
+    var hu = c.handUp || 0, wipe = c.wipe || 0, reach = c.reach || 0, pray = c.prayPose || 0, hp = c.holdPhoto || 0;
+    var armIdle = Math.sin(t * 0.55 + c.breathPhase) * 0.03;
+
+    // right arm: reaches the glass / the wallet / holds the photo
+    c.armR.shoulder.rotation.x = -0.35 - hu * 0.45 - reach * 0.3 - hp * 0.75 + armIdle;
+    c.armR.shoulder.rotation.z = 0.14 - hu * 0.12 - reach * 0.25 - hp * 0.1;
+    c.armR.elbow.rotation.x = -0.5 - hu * 1.15 - reach * 1.4 - hp * 1.5 + armIdle * 0.5;
+
+    // left arm: rests on the bar, wipes the eyes, folds in prayer
+    c.armL.shoulder.rotation.x = -0.4 - wipe * 1.1 - pray * 0.55 + armIdle * 0.8;
+    c.armL.shoulder.rotation.z = -0.14 + wipe * 0.3 + pray * 0.2;
+    c.armL.elbow.rotation.x = -0.55 - wipe * 1.5 - pray * 1.75 + armIdle * 0.4;
+
+    // praying: hands come together and tremble slightly
+    if (pray > 0.05) {
+      c.armR.shoulder.rotation.x -= pray * 0.5;
+      c.armR.shoulder.rotation.z -= pray * 0.22;
+      c.armR.elbow.rotation.x -= pray * 1.7;
+      var trem = Math.sin(t * 11) * 0.006 * pray;
+      c.armL.elbow.rotation.z = trem;
+      c.armR.elbow.rotation.z = -trem;
+    }
+  }
+
+  // ---------------------------------------------------------------- camera
+  var camPos = new THREE.Vector3(0.1, 2.05, 5.5);
+  var camLook = new THREE.Vector3(0.05, 1.42, 0.2);
+  var tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+
+  function shotVec(shot, key, out, t) {
+    out.set(shot[key][0], shot[key][1], shot[key][2]);
+    if (key === "pos") {
+      // continuous handheld drift, unique per shot
+      var dr = shot.drift;
+      out.x += Math.sin(t * 0.21 + shot.fov) * 0.055 * dr[0];
+      out.y += Math.sin(t * 0.17 + 1.3) * 0.04 * dr[1];
+      out.z += Math.cos(t * 0.13 + 2.1) * 0.06 * dr[2];
+      // slow push-in over the life of the shot
+      var age = Math.min(1, (t - shotStart) / 14);
+      out.z -= age * 0.14 * dr[0];
+      out.y += age * 0.02 * dr[1];
+    }
+    return out;
+  }
+
+  function updateCamera(dt, t) {
+    if (shotT < 1) shotT = Math.min(1, shotT + dt / 0.85);
+    var k = shotT < 1 ? (shotT * shotT * (3 - 2 * shotT)) : 1;   // smoothstep cut
+
+    shotVec(prevShot, "pos", tmpA, t);
+    shotVec(curShot, "pos", tmpB, t);
+    tmpA.lerp(tmpB, k);
+    camPos.lerp(tmpA, 1 - Math.exp(-7 * dt));
+
+    shotVec(prevShot, "look", tmpA, t);
+    shotVec(curShot, "look", tmpB, t);
+    tmpA.lerp(tmpB, k);
+    camLook.lerp(tmpA, 1 - Math.exp(-6 * dt));
+
+    var fov = prevShot.fov + (curShot.fov - prevShot.fov) * k;
+    // breathing lens
+    fov += Math.sin(t * 0.23) * 0.22;
+    if (Math.abs(camera.fov - fov) > 0.002) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
+
+    camera.position.copy(camPos);
+    camera.lookAt(camLook);
+    // a hair of roll keeps it from feeling like a tripod
+    camera.rotation.z += Math.sin(t * 0.19 + 0.8) * 0.004;
+  }
+
+  // ---------------------------------------------------------------- lights
+  function updateMood(dt, t) {
+    for (var k in targetMood) if (Object.prototype.hasOwnProperty.call(targetMood, k)) {
+      mood[k] = ease(mood[k] === undefined ? targetMood[k] : mood[k], targetMood[k], 0.9, dt);
+    }
+    pendants.forEach(function (p, i) {
+      // every practical flickers on its own cycle — a dying bulb in a dive bar
+      var f = 1
+        + Math.sin(t * 7.3 + p.phase) * 0.035
+        + Math.sin(t * 23.1 + p.phase * 2) * 0.02
+        + (Math.random() < 0.004 ? -0.3 : 0);
+      p.light.intensity = mood.pend * f;
+      p.bulb.material.color.setHSL(0.09, 0.78, 0.55 + f * 0.12);
+      // the pendants sway, so their shadows move across the bar
+      p.group.rotation.z = Math.sin(t * 0.37 + p.phase) * 0.02;
+      p.group.position.x = p.baseX + Math.sin(t * 0.31 + p.phase) * 0.02;
+    });
+    key.intensity = mood.key * (1 + Math.sin(t * 3.1) * 0.02);
+    coldWash.intensity = mood.cold;
+    ambient.intensity = mood.amb;
+    neon.intensity = mood.neon * (1 + Math.sin(t * 14.7) * 0.06 + (Math.random() < 0.01 ? -0.5 : 0));
+    scene.fog.near = mood.fogN;
+    scene.fog.far = mood.fogF;
+  }
+
+  // ---------------------------------------------------------------- props
+  function updateProps(dt, t) {
+    // whiskey drains; the surface sloshes continuously
+    var lvl = 0.02 + whiskeyLevel * 0.1;
+    whiskey.scale.y = ease(whiskey.scale.y, Math.max(0.04, lvl / 0.1), 1.6, dt);
+    whiskey.position.y = 0.012 + (0.1 * whiskey.scale.y) / 2;
+    whiskey.rotation.z = Math.sin(t * 2.3) * 0.02;
+    whiskey.visible = whiskeyLevel > 0.02;
+
+    water.rotation.z = Math.sin(t * 1.7 + 1) * 0.015;
+    water.position.y = 0.078 + Math.sin(t * 2.1) * 0.0015;
+
+    // the glass itself gets nudged when a hand is on it
+    whiskeyGlass.position.x = -0.6 + Math.sin(t * 0.8) * 0.004 * (atheist.handUp || 0);
+    whiskeyGlass.rotation.z = Math.sin(t * 1.4) * 0.03 * (atheist.handUp || 0);
+    waterGlass.rotation.z = Math.sin(t * 0.9 + 2) * 0.012 * (1 - (pastor.handUp || 0));
+
+    // photograph: comes out of the wallet, is held, then folded away
+    photoOut = ease(photoOut, Math.max((pastor.reach || 0) > 0.25 ? 1 : 0, (pastor.holdPhoto || 0) > 0.08 ? 0.85 : 0), 1.8, dt);
+    photo.visible = photoOut > 0.03;
+    if (photo.visible) {
+      photo.position.set(
+        0.42 - photoOut * 0.22,
+        1.30 + photoOut * 0.20 + Math.sin(t * 1.3) * 0.006,
+        0.25 + photoOut * 0.5
+      );
+      // tips fully upright as it is handed over, facing the camera
+      photo.rotation.x = -Math.PI / 2 + photoOut * (Math.PI / 2);
+      photo.rotation.y = -0.25 + Math.sin(t * 0.7) * 0.05;
+      photo.rotation.z = Math.sin(t * 0.9 + 1) * 0.03;
+      photo.scale.setScalar(0.8 + photoOut * 1.0);
+    }
+
+    // door swings as he reaches it, cold street light spills in
+    doorPanel.rotation.y = ease(doorPanel.rotation.y, doorOpen * -0.85, 2.2, dt);
+    doorGlow.material.opacity = 0.22 + doorOpen * 0.3 + Math.sin(t * 0.5) * 0.02;
+
+    // bartender: always working in the background, then comes to close
+    var bx, bz;
+    if (bartenderClosing > 0.5) {
+      bx = ease(bartender.position.x, -0.2, 0.6, dt);
+      bz = ease(bartender.position.z, -1.5, 0.6, dt);
+    } else {
+      bx = -2.4 + Math.sin(t * 0.22) * 1.5;
+      bz = -2.3 + Math.sin(t * 0.17) * 0.25;
+    }
+    bartender.position.x = bx;
+    bartender.position.z = bz;
+    bartender.position.y = Math.abs(Math.sin(t * 1.2)) * 0.012;
+    bartender.rotation.y = Math.sin(t * 0.22) * 0.5 + 0.1;
+    // wiping down the bar
+    btArmR.rotation.x = -0.6 + Math.sin(t * 3.1) * 0.5;
+    btArmL.rotation.x = -0.2 + Math.sin(t * 1.4) * 0.2;
+    btHead.rotation.y = Math.sin(t * 0.9) * 0.3;
+
+    // dust drifts and rises in the light
+    var pos = dustGeo.attributes.position.array;
+    for (var i = 0; i < dustCount; i++) {
+      var s = dustSeed[i];
+      pos[i * 3] += Math.sin(t * s.sp + s.ph) * 0.0009 * s.amp;
+      pos[i * 3 + 1] += 0.0016 * s.sp;
+      pos[i * 3 + 2] += Math.cos(t * s.sp * 0.8 + s.ph) * 0.0007 * s.amp;
+      if (pos[i * 3 + 1] > 3.6) pos[i * 3 + 1] = 0.25;
+    }
+    dustGeo.attributes.position.needsUpdate = true;
+    dust.material.opacity = 0.2 + mood.pend * 0.22;
+
+    // bottles catch the swaying light
+    bottles.forEach(function (b, i) {
+      b.obj.position.y = b.baseY + Math.sin(t * 0.3 + i) * 0.0008;
+    });
+  }
+
+  // =====================================================================
+  //  MAIN LOOP
+  // =====================================================================
+  var capEnd = document.getElementById("end");
+
+  // ---- deterministic render mode -------------------------------------
+  // Advance by a fixed timestep and draw exactly one frame per call, so the
+  // output is frame-accurate and identical on every run.
+  var FIXED_DT = 1 / 30;
+  var renderTime = 0;
+
+  function renderStep(targetTime) {
+    // step the simulation forward in fixed increments up to targetTime
+    while (renderTime < targetTime - 1e-6) {
+      var dt = Math.min(FIXED_DT, targetTime - renderTime);
+      renderTime += dt;
+      time = renderTime;
+
+      while (beatIdx + 1 < BEATS.length && BEATS[beatIdx + 1].t <= time) {
+        enterBeat(beatIdx + 1);
+      }
+      var cb = BEATS[beatIdx];
+      if (cb && cb.text && time > cb.t + cb.d + 0.25) capEl.classList.remove("on");
+      else if (cb && cb.text) capEl.classList.add("on");
+
+      var b = BEATS[beatIdx];
+      var speaking = b && b.text && time < b.t + b.d;
+      atheistTalking = ease(atheistTalking, speaking && b.spk === "n" ? 1 : 0, 14, dt);
+      pastorTalking  = ease(pastorTalking,  speaking && b.spk === "d" ? 1 : 0, 14, dt);
+
+      animatePerson(atheist, A, dt, time, atheistTalking, true);
+      animatePerson(pastor, P, dt, time, pastorTalking, false);
+      updateCamera(dt, time);
+      updateMood(dt, time);
+      updateProps(dt, time);
+    }
+    renderer.render(scene, camera);
+  }
+
+
+  // ---- offscreen compositor for video export -------------------------
+  var _cmp = document.createElement("canvas");
+  var _cx = _cmp.getContext("2d");
+  var _grainPat = null;
+
+  function buildGrain() {
+    var g = document.createElement("canvas");
+    g.width = g.height = 128;
+    var gc = g.getContext("2d");
+    var im = gc.createImageData(128, 128);
+    for (var i = 0; i < im.data.length; i += 4) {
+      var v = (Math.random() * 255) | 0;
+      im.data[i] = im.data[i+1] = im.data[i+2] = v;
+      im.data[i+3] = 255;
+    }
+    gc.putImageData(im, 0, 0);
+    _grainPat = _cx.createPattern(g, "repeat");
+  }
+
+  function wrapText(ctx, text, maxW) {
+    var words = text.split(" "), lines = [], cur = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = cur ? cur + " " + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = words[i]; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function compositeFrame() {
+    var W = canvas.width, H = canvas.height;
+    if (_cmp.width !== W || _cmp.height !== H) {
+      _cmp.width = W; _cmp.height = H;
+      buildGrain();
+    }
+    _cx.globalAlpha = 1;
+    _cx.globalCompositeOperation = "source-over";
+    _cx.drawImage(canvas, 0, 0, W, H);
+
+    // vignette (matches the CSS #grade multiply)
+    var g = _cx.createRadialGradient(W*0.5, H*0.46, Math.min(W,H)*0.22,
+                                     W*0.5, H*0.46, Math.max(W,H)*0.72);
+    g.addColorStop(0, "rgba(6,5,8,0)");
+    g.addColorStop(0.72, "rgba(6,5,8,0.3)");
+    g.addColorStop(1, "rgba(4,3,6,0.62)");
+    _cx.globalCompositeOperation = "multiply";
+    _cx.fillStyle = g;
+    _cx.fillRect(0, 0, W, H);
+
+    // grain
+    _cx.globalCompositeOperation = "overlay";
+    _cx.globalAlpha = 0.05;
+    if (_grainPat) {
+      _cx.save();
+      _cx.translate(-(Math.random()*40|0), -(Math.random()*40|0));
+      _cx.fillStyle = _grainPat;
+      _cx.fillRect(0, 0, W + 48, H + 48);
+      _cx.restore();
+    }
+    _cx.globalAlpha = 1;
+    _cx.globalCompositeOperation = "source-over";
+
+    // caption, drawn to match the on-page subtitle band
+    var b = BEATS[beatIdx];
+    var visible = hasCaption(b) && time >= b.t && time <= b.t + b.d + 0.25;
+    if (visible) {
+      var scale = H / 720;
+      var bodySize = Math.round(25 * scale);
+      var maxW = Math.min(W * 0.76, 760 * scale);
+
+      _cx.textAlign = "center";
+      _cx.textBaseline = "alphabetic";
+      _cx.font = bodySize + 'px Bitter, Georgia, serif';
+      var lines = wrapText(_cx, b.text, maxW);
+      var lineH = bodySize * 1.42;
+      var baseY = H - Math.round(84 * scale) - (lines.length - 1) * lineH;
+
+      var who = b.spk === "a" ? "THE ATHEIST" : "THE PASTOR";
+      var lblSize = Math.round(11 * scale);
+      _cx.font = "600 " + lblSize + 'px Archivo, Arial, sans-serif';
+      _cx.letterSpacing = Math.round(3 * scale) + "px";
+      _cx.fillStyle = b.spk === "a" ? "rgba(111,144,196,0.72)" : "rgba(232,162,76,0.72)";
+      _cx.shadowColor = "rgba(0,0,0,0.95)";
+      _cx.shadowBlur = 10 * scale;
+      _cx.fillText(who, W / 2, baseY - lineH - Math.round(13 * scale));
+      _cx.letterSpacing = "0px";
+
+      _cx.font = bodySize + 'px Bitter, Georgia, serif';
+      _cx.fillStyle = "rgba(239,230,220,1)";
+      _cx.shadowColor = "rgba(0,0,0,0.95)";
+      _cx.shadowBlur = 18 * scale;
+      for (var i = 0; i < lines.length; i++) {
+        _cx.fillText(lines[i], W / 2, baseY + i * lineH);
+      }
+      _cx.shadowBlur = 0;
+    }
+
+    return _cmp.toDataURL("image/jpeg", 0.93);
+  }
+
+  window.__dbg = function () {
+    return {
+      photoVis: photo.visible,
+      photoOut: +photoOut.toFixed(3),
+      photoPos: [+photo.position.x.toFixed(2), +photo.position.y.toFixed(2), +photo.position.z.toFixed(2)],
+      Preach: +(pastor.reach || 0).toFixed(3),
+      Phold: +(pastor.holdPhoto || 0).toFixed(3),
+      beat: beatIdx,
+      camPos: [+camera.position.x.toFixed(2), +camera.position.y.toFixed(2), +camera.position.z.toFixed(2)]
+    };
+  };
+
+  window.__film = {
+    duration: DURATION,
+    fps: 30,
+    seekTo: function (t) { renderStep(t); },
+    grab: function (t) {
+      renderStep(t);
+      return compositeFrame();
+    },
+    reset: function () { seek(0); renderTime = 0; time = 0; }
+  };
+
+  function fmt(s) {
+    var m = Math.floor(s / 60);
+    var ss = Math.floor(s % 60);
+    return m + ":" + (ss < 10 ? "0" : "") + ss;
+  }
+
+  // =====================================================================
+  //  UI
+  // =====================================================================
+  var fillEl = document.getElementById("fill");
+  var scrubEl = document.getElementById("scrub");
+  var clockEl = document.getElementById("clock");
+  var toggleEl = document.getElementById("toggle");
+  var barEl = document.getElementById("bar");
+  var titleEl = document.getElementById("title");
+
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // Re-derive which beat we are in after the audio jumps backwards.
+  function resyncBeats() {
+    var last = -1;
+    for (var i = 0; i < BEATS.length; i++) {
+      if (BEATS[i].t <= time) last = i; else break;
+    }
+    if (last !== beatIdx) {
+      beatIdx = last;
+      if (last >= 0) {
+        var b = BEATS[last];
+        if (b.cam && SHOTS[b.cam]) { prevShot = curShot; curShot = SHOTS[b.cam]; shotT = 0; shotStart = time; }
+        showBeat(last);
+      }
+    }
+  }
+
+  function start() {
+    titleEl.classList.add("gone");
+    capEnd.classList.remove("on");
+    playing = true;
+    if (audioReady) {
+      try { voice.currentTime = time; voice.play(); } catch (e) {}
+    }
+    toggleEl.textContent = "Pause";
+    barEl.classList.add("show");
+    setTimeout(function () { barEl.classList.remove("show"); }, 2600);
+  }
+
+  var loadingEl = document.getElementById("loading");
+  var playBtn = document.getElementById("play");
+  playBtn.disabled = true;
+  playBtn.style.opacity = "0.45";
+
+  function audioIsReady() {
+    if (audioReady) return;
+    audioReady = true;
+    loadingEl.hidden = true;
+    playBtn.disabled = false;
+    playBtn.style.opacity = "";
+  }
+  voice.addEventListener("canplaythrough", audioIsReady);
+  voice.addEventListener("loadeddata", audioIsReady);
+  voice.addEventListener("error", function () {
+    // Narration failed: still let the film play. Only dialogue is subtitled,
+    // so without the voice track the stage directions are lost - say so.
+    loadingEl.textContent = "Narration unavailable \u2014 the film plays silent";
+    playBtn.disabled = false;
+    playBtn.style.opacity = "";
+  });
+
+  playBtn.addEventListener("click", function () {
+    seek(0);
+    start();
+  });
+  document.getElementById("again").addEventListener("click", function () {
+    seek(0);
+    start();
+  });
+  toggleEl.addEventListener("click", function () {
+    playing = !playing;
+    toggleEl.textContent = playing ? "Pause" : "Play";
+    if (playing) {
+      capEnd.classList.remove("on");
+      if (audioReady) { try { voice.currentTime = time; voice.play(); } catch (e) {} }
+    } else {
+      voice.pause();
+    }
+  });
+  document.getElementById("back").addEventListener("click", function () {
+    seek(time - 10);
+  });
+
+  function scrubTo(clientX) {
+    var r = scrubEl.getBoundingClientRect();
+    seek(((clientX - r.left) / r.width) * DURATION);
+  }
+  var dragging = false;
+  scrubEl.addEventListener("pointerdown", function (e) {
+    dragging = true;
+    scrubEl.setPointerCapture(e.pointerId);
+    scrubTo(e.clientX);
+  });
+  scrubEl.addEventListener("pointermove", function (e) {
+    if (dragging) scrubTo(e.clientX);
+  });
+  scrubEl.addEventListener("pointerup", function () { dragging = false; });
+  scrubEl.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") { seek(time - 5); e.preventDefault(); }
+    if (e.key === "ArrowRight") { seek(time + 5); e.preventDefault(); }
+  });
+
+  window.addEventListener("keydown", function (e) {
+    if (e.key === " ") {
+      e.preventDefault();
+      if (titleEl.classList.contains("gone")) toggleEl.click();
+      else document.getElementById("play").click();
+    }
+  });
+
+  // reveal the transport whenever the pointer comes near the bottom
+  window.addEventListener("pointermove", function (e) {
+    if (e.clientY > window.innerHeight - 90) barEl.classList.add("show");
+    else barEl.classList.remove("show");
+  });
+
+  // Keep the room alive behind the title card, so the first thing anyone
+  // sees is already moving.
+  seek(0);
+  updateCamera(0, 0);
+  shotT = 1;
+  updateCamera(0, 0);
+  window.__filmReady = true;
+})();
+</script>

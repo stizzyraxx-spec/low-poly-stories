@@ -16,3 +16,7 @@ sync/
 
 node_modules/
 .DS_Store
+
+# narration masters live outside git (large, not licensed for reuse)
+uploads/
+films/*/src/narration.mp3
