@@ -541,6 +541,7 @@
       stoolLeg.rotation.set(Math.sin(a) * 0.1, 0, -Math.cos(a) * 0.1);
       stool.add(stoolLeg);
     }
+    stool.visible = false;   // David has the throne, Nathan stands
     P.add(stool);
 
     // --- hips / torso / chest stack (each a joint we can animate) ---
@@ -752,8 +753,7 @@
   var water = new THREE.Mesh(new THREE.CylinderGeometry(0.061, 0.054, 0.15, 8), mat(PAL.water, { transparent: true, opacity: 0.62 }));
   water.position.y = 0.078;
   waterGlass.add(water);
-  waterGlass.position.set(0.74, 1.16, -0.42);
-  set.add(waterGlass);
+  waterGlass.visible = false;   // no drinks in the throne room
 
   // the photograph — the only object in the film with any detail
   var photo = new THREE.Group();
@@ -788,8 +788,7 @@
   var btArmR = btArmL.clone();
   btArmR.position.x = 0.26;
   bartender.add(btArmR);
-  bartender.position.set(-2.4, 0, -2.3);
-  set.add(bartender);
+  bartender.visible = false;   // no bartender in the throne room
 
   // dust motes in the light beams — constant drift, never still
   var dustCount = 420;
@@ -1005,6 +1004,8 @@ var BEATS = [
 
     // --- posture ---
     var lean = c.lean || 0, slump = c.slump || 0, stand = c.stand || 0, away = c.away || 0;
+    // Nathan stands throughout; David is seated on the throne.
+    if (isAtheist) stand = 1;
     c.torso.rotation.x = lean * 0.2 + slump * 0.17 + breath * 0.5;
     c.torso.rotation.z = sway;
     c.hips.position.y = 0.86 + stand * 0.2 - slump * 0.035 + Math.sin(bp) * 0.004;
@@ -1201,7 +1202,7 @@ var BEATS = [
 
     // photograph: comes out of the wallet, is held, then folded away
     photoOut = ease(photoOut, Math.max((pastor.reach || 0) > 0.25 ? 1 : 0, (pastor.holdPhoto || 0) > 0.08 ? 0.85 : 0), 1.8, dt);
-    photo.visible = photoOut > 0.03;
+    photo.visible = false;   // no photograph in this story
     if (photo.visible) {
       photo.position.set(
         0.42 - photoOut * 0.22,
@@ -1215,9 +1216,7 @@ var BEATS = [
       photo.scale.setScalar(0.8 + photoOut * 1.0);
     }
 
-    // door swings as he reaches it, cold street light spills in
-    doorPanel.rotation.y = ease(doorPanel.rotation.y, doorOpen * -0.85, 2.2, dt);
-    doorGlow.material.opacity = 0.22 + doorOpen * 0.3 + Math.sin(t * 0.5) * 0.02;
+    // (no door in the throne room - the bar's door animation is gone)
 
     // bartender: always working in the background, then comes to close
     var bx, bz;

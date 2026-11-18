@@ -249,6 +249,72 @@ ACTIONS = '''  function fireAction(tag) {
 '''
 
 
+# The throne room has no street door, so the SET replacement below drops
+# doorPanel and doorGlow. The per-frame loop still animated them, which threw
+# `doorPanel is not defined` on the first frame and failed every render.
+# Remove the two orphaned lines from both outputs.
+DOOR_ANIM = """    // door swings as he reaches it, cold street light spills in
+    doorPanel.rotation.y = ease(doorPanel.rotation.y, doorOpen * -0.85, 2.2, dt);
+    doorGlow.material.opacity = 0.22 + doorOpen * 0.3 + Math.sin(t * 0.5) * 0.02;
+"""
+DOOR_ANIM_TO = """    // (no door in the throne room - the bar's door animation is gone)
+"""
+
+
+# The SET swap replaced the room but not the bar's PROPS. A whiskey tumbler,
+# the photograph and the bartender were still built and added to the scene, and
+# the stool was built inside buildPerson, so both men sat on an invisible stool
+# in the throne room. Remove the props; seat only David, and stand Nathan up.
+
+# 1. the pastor's glass of water / whiskey tumbler on the bar
+GLASS_FROM = """  waterGlass.position.set(0.74, 1.16, -0.42);
+  set.add(waterGlass);"""
+GLASS_TO = """  waterGlass.visible = false;   // no drinks in the throne room"""
+
+# 2. the photograph from the wallet - a modern prop, no place here
+PHOTO_FROM = """    photo.visible = photoOut > 0.03;"""
+PHOTO_TO = """    photo.visible = false;   // no photograph in this story"""
+
+# 3. the bartender working the back bar
+BARTENDER_FROM = """  bartender.position.set(-2.4, 0, -2.3);
+  set.add(bartender);"""
+BARTENDER_TO = """  bartender.visible = false;   // no bartender in the throne room"""
+
+# 4. the stool, built into every character. David sits on the throne, which the
+#    set provides; Nathan stands. Neither needs a bar stool.
+STOOL_FROM = """    P.add(stool);"""
+STOOL_TO = """    stool.visible = false;   // David has the throne, Nathan stands
+    P.add(stool);"""
+
+# 5. Nathan is a prophet who came to confront the king: he is on his feet for
+#    the whole film. `stand` already exists in the rig, so hold it at 1 for him
+#    rather than inventing a new pose. David keeps the seated pose on the throne.
+STAND_FROM = """    var lean = c.lean || 0, slump = c.slump || 0, stand = c.stand || 0, away = c.away || 0;"""
+STAND_TO = """    var lean = c.lean || 0, slump = c.slump || 0, stand = c.stand || 0, away = c.away || 0;
+    // Nathan stands throughout; David is seated on the throne.
+    if (isAtheist) stand = 1;"""
+
+
+def strip_props(text, label):
+    """Remove the bar's props and stand Nathan up. Each edit must apply once."""
+    for frm, to, what in (
+        (GLASS_FROM, GLASS_TO, 'water glass'),
+        (PHOTO_FROM, PHOTO_TO, 'photograph'),
+        (BARTENDER_FROM, BARTENDER_TO, 'bartender'),
+        (STOOL_FROM, STOOL_TO, 'stool'),
+        (STAND_FROM, STAND_TO, 'standing pose'),
+    ):
+        assert text.count(frm) == 1, '%s not found once in %s' % (what, label)
+        text = text.replace(frm, to)
+    return text
+
+
+def strip_door(text, label):
+    """Drop the bar-door animation; assert it was there exactly once."""
+    assert text.count(DOOR_ANIM) == 1, 'door anim not found once in ' + label
+    return text.replace(DOOR_ANIM, DOOR_ANIM_TO)
+
+
 def main():
     src = io.open(ENGINE, encoding='utf-8').read()
 
@@ -333,6 +399,8 @@ def main():
     assert src.count(PRIME_FROM) <= 1
 
     if PRIME_FROM in src: src = src.replace(PRIME_FROM, PRIME_TO)
+    src = strip_door(src, 'index.html')
+    src = strip_props(src, 'index.html')
     io.open(OUT, 'w', encoding='utf-8').write(src)
     print('wrote', OUT, len(src), 'bytes')
 
@@ -366,6 +434,8 @@ def main():
     assert '  var AUDIO_SRC = "";' in rm
     rm = rm.replace('<title>Two Fathers', '<title>You Are the Man')
     if PRIME_FROM in rm: rm = rm.replace(PRIME_FROM, PRIME_TO)
+    rm = strip_door(rm, 'render-mode.html')
+    rm = strip_props(rm, 'render-mode.html')
     rm_out = os.path.join(HERE, 'render-mode.html')
     io.open(rm_out, 'w', encoding='utf-8').write(rm)
     print('wrote', rm_out, len(rm), 'bytes')
