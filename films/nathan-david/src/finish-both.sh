@@ -14,8 +14,13 @@ ND="$REPO/films/nathan-david/src"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # ---- 1. wait for the in-flight Two Fathers render to drain -------------
-log "waiting for the Two Fathers render to finish"
-while pgrep -f render-resilient.js > /dev/null; do
+# Wait on the node processes themselves, matched by executable name, not by
+# a -f pattern: `pgrep -f render-resilient.js` also matches THIS script's own
+# command line and the shell that launched it, so the loop waits on itself and
+# never exits. (That deadlock cost a run on 2026-11-18.) `pgrep -x node`
+# matches only processes whose executable is node, which this script is not.
+log "waiting for any in-flight render to finish"
+while pgrep -x node > /dev/null; do
   sleep 30
 done
 log "two-fathers frames on disk: $(ls "$SP/frames" | wc -l)"
