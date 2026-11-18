@@ -33,6 +33,7 @@ MODULES = [
     'animations/perform.js',
     'environments/sets.js',
     'lighting/moods.js',
+    'cameras/solve.js',
     'cameras/shots.js',
     'animations/beats.js',
     'characters/cast.js',
@@ -124,6 +125,9 @@ MAIN = r'''
     allCast[ci].root.visible = false;
     scene.add(allCast[ci].root);
   }
+
+  // Shots are derived from the cast, so they are built once the cast exists.
+  buildShots(cast);
 
   // the holy shaft sits on the road at the conversion point
   var shaft = buildHolyShaft();

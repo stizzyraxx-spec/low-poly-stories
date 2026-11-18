@@ -23,6 +23,7 @@ function makeFilm(ctx) {
 
   var vTmp = new THREE.Vector3(), vLook = new THREE.Vector3();
   // scratch colours, reused every frame so the loop allocates nothing
+  var vDer = new THREE.Vector3(), vDerLook = new THREE.Vector3();
   var cFog = new THREE.Color(), cSky = new THREE.Color();
   var cSun = new THREE.Color(), cAmbS = new THREE.Color(), cAmbG = new THREE.Color();
   var curSun = new THREE.Color(MOODS.jerus.sunCol);
@@ -79,6 +80,19 @@ function makeFilm(ctx) {
     var eu = smoothstep(u);
 
     var px, py, pz;
+    if (shot.derive) {
+      // A derived shot is solved from live character positions, so it cannot
+      // fall out of agreement with staging the way typed coordinates do.
+      shot.derive(t, vDer, vDerLook, eu);
+      px = vDer.x; py = vDer.y; pz = vDer.z;
+      var d0 = shot.drift || [0.2, 0.1, 0.1];
+      px += Math.sin(t * 0.17 + 1.3) * d0[0] * 0.14;
+      py += Math.sin(t * 0.23 + 2.1) * d0[1] * 0.12;
+      pz += Math.sin(t * 0.13 + 0.7) * d0[2] * 0.14;
+      return { x: px, y: py, z: pz,
+               lx: vDerLook.x, ly: vDerLook.y, lz: vDerLook.z,
+               fov: shot.fov };
+    }
     if (shot.path) {
       bez3(shot.path, eu, vTmp);
       px = vTmp.x; py = vTmp.y; pz = vTmp.z;

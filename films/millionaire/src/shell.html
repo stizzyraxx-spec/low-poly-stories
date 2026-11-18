@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Millionaire Who Lost Everything</title>
+<style>
+  html,body{margin:0;background:#000;overflow:hidden}
+  #stage{display:block;width:100vw;height:56.25vw;max-height:100vh;max-width:177.78vh;
+         position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+  #gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:#000;color:#e8dcc8;font:600 15px/1.5 system-ui,-apple-system,sans-serif;
+        letter-spacing:.18em;text-transform:uppercase;cursor:pointer;z-index:9999}
+  #gate.off{display:none}
+</style>
+<canvas id="stage" width="1280" height="720"></canvas>
+<audio id="voice" preload="auto"></audio>
+<div id="gate">Play &mdash; sound on</div>
+THREE_TAG
+<script>
+(function () {
+  "use strict";
+  var AUDIO_SRC = "AUDIO_PLACEHOLDER";
+  var THREE = window.THREE;
+
+  // Deterministic pseudo-random. The render is sharded across processes and
+  // restarted after crashes, so every frame must be reproducible; nothing may
+  // call Math.random() once the scene is built.
+  var NSEED = 1973;
+  function rnd() {
+    NSEED = (NSEED * 1103515245 + 12345) & 0x7fffffff;
+    return NSEED / 0x7fffffff;
+  }
+
+  function mat(hex, o) {
+    o = o || {};
+    var m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
+    if (o.transparent) { m.transparent = true; m.opacity = o.opacity; }
+    if (o.emissive) m.emissive = new THREE.Color(o.emissive);
+    if (o.side) m.side = o.side;
+    return m;
+  }
+  function emat(hex, op) {
+    return new THREE.MeshBasicMaterial({ color: hex, transparent: true,
+                                         opacity: op === undefined ? 1 : op });
+  }
+
+MODULES_HERE
+
+MAIN_HERE
+})();
+</script>
