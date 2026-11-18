@@ -20,6 +20,8 @@ function buildSkyline(opts) {
   opts = opts || {};
   var G = new THREE.Group();
   var st = { v: SKYLINE_SEED };
+  // Four distinct tones so the skyline has depth. Near-identical pale
+  // greys read as one white mass once fog is applied.
   var cols = [PAL.towerA, PAL.towerB, PAL.towerC, PAL.towerFar];
   var n = opts.count || 70;
   for (var i = 0; i < n; i++) {
@@ -112,10 +114,22 @@ function buildOffice() {
   floor.receiveShadow = true;
   S.add(floor);
 
-  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(18, 15), mat(0xe4e2de));
-  ceil.rotation.x = Math.PI / 2;
-  ceil.position.y = 3.5;
+  // The ceiling is a slab, not a plane. A single-sided plane facing down
+  // renders as a black hole when the opening aerial looks at the building
+  // from above, which is exactly what the first render did.
+  var ceil = new THREE.Mesh(new THREE.BoxGeometry(19, 0.4, 16), mat(0xbdbab4));
+  ceil.position.y = 3.7;
   S.add(ceil);
+  // rooftop plant, so the aerial sees a building top rather than a slab
+  var plant1 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.5, 3.4), mat(0x9a9890));
+  plant1.position.set(-4.5, 4.65, -2.0);
+  S.add(plant1);
+  var plant2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 2.6), mat(0x8a8882));
+  plant2.position.set(4.2, 4.4, 2.2);
+  S.add(plant2);
+  var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 5.5, 6), mat(0x6e6c68));
+  mast.position.set(6.5, 6.6, -4.5);
+  S.add(mast);
 
   // floor-to-ceiling glass along the front and right
   var mull = mat(PAL.steelDark);
@@ -232,7 +246,35 @@ function buildOffice() {
     S.add(cch);
   }
 
-  S.add(buildSkyline({ count: 70 }));
+  // The tower this office sits in. Without it the aerial showed the room
+  // floating in open sky with the city hanging around it.
+  //
+  // The shaft and the ground go DOWN from the office floor rather than the
+  // city being moved: the skydome is centred on the world origin, so
+  // relocating everything below y=0 puts the aerial camera outside the dome
+  // and it renders as a black mass across the sky. Keeping the office at
+  // y=0 and hanging the building beneath it leaves the dome where it works.
+  var shaft = new THREE.Mesh(new THREE.BoxGeometry(19, 150, 16), mat(PAL.towerA));
+  shaft.position.set(0, -75.2, -0.9);
+  S.add(shaft);
+  for (var fl = 0; fl < 42; fl++) {
+    var band = new THREE.Mesh(new THREE.BoxGeometry(19.15, 1.6, 16.15),
+      mat(PAL.glassDark));
+    band.position.set(0, -3.0 - fl * 3.5, -0.9);
+    S.add(band);
+  }
+
+  var grd = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), mat(0x6e7276));
+  grd.rotation.x = -Math.PI / 2;
+  grd.position.y = -150;
+  S.add(grd);
+
+  // Neighbours rise from that ground. They are built around the origin, so
+  // they are lowered and scaled tall enough to read from this height.
+  var sky = buildSkyline({ count: 70 });
+  sky.position.y = -150;
+  sky.scale.y = 2.6;
+  S.add(sky);
   S.visible = false;
   return S;
 }

@@ -10,9 +10,12 @@
 
 var MOODS = {
   // ---- 1-2: the office ----
+  // The opening aerial looks across ~200 units of city, so the fog has to
+  // reach much further than an interior's would or the skyline washes to
+  // flat white and the towers lose all separation.
   empire:    { sun: 2.9, sunCol: 0xffe6c0, amb: 1.05, ambSky: 0xcfe0f0, ambGnd: 0x9a9288,
-               fogN: 40, fogF: 260, fogCol: 0xc8d8e8, exp: 1.06,
-               skyTop: 0x7fb0e0, lamp: 0, rain: 0 },
+               fogN: 120, fogF: 1100, fogCol: 0xb8cce0, exp: 1.06,
+               skyTop: 0x6fa6dc, lamp: 0, rain: 0 },
   cooling:   { sun: 2.1, sunCol: 0xe8dcc8, amb: 0.92, ambSky: 0xb4c0cc, ambGnd: 0x7f7a74,
                fogN: 34, fogF: 220, fogCol: 0xb8c4d0, exp: 0.99,
                skyTop: 0x7a95ad, lamp: 0, rain: 0 },
@@ -103,7 +106,10 @@ function buildLights(scene) {
   // Skydome: the interiors have big windows and the exteriors look at a
   // horizon, so without geometry up there the frame shows the clear colour
   // as a hard band. Horizon takes the fog colour so the ground never seams.
-  var skyGeo = new THREE.SphereGeometry(360, 18, 12);
+  // Radius must exceed the farthest camera position: the opening aerial
+  // sits at y=34, z=46, and a dome smaller than that puts the camera
+  // OUTSIDE it, where its back faces render as a black mass.
+  var skyGeo = new THREE.SphereGeometry(900, 20, 14);
   var skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {

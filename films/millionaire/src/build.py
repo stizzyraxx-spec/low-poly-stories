@@ -103,7 +103,9 @@ MAIN = r'''
   renderer.toneMappingExposure = 1.0;
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(38, 1280 / 720, 0.1, 400);
+  // Far plane must clear the skydome (r=900) and the city below it, or
+  // the dome is clipped away and the sky renders black.
+  var camera = new THREE.PerspectiveCamera(38, 1280 / 720, 0.1, 2200);
 
   var lights = buildLights(scene);
 
