@@ -122,10 +122,39 @@ SET = """  // floor
     tleg.position.set(tl < 2 ? -0.45 : 0.45, 0.26, tl % 2 ? -0.22 : 0.22);
     tableG.add(tleg);
   }
-  tableG.position.set(1.95, 0, 1.05);
+  tableG.position.set(2.75, 0, 1.5);
   tableG.rotation.y = -0.4;
   set.add(tableG);
 """
+
+
+# --------------------------------------------------------------- braziers
+# The light rig keeps its name and its wiring (updateMood drives `pendants`),
+# but the fixture is a standing brazier on a tripod, not a hanging lamp, and
+# it stands on the floor rather than over a bar.
+BRAZ_FROM = """    var shade = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 7, 1, true), mat(0x3a2b22, { side: THREE.DoubleSide }));
+    shade.position.y = -0.08;
+    g.add(shade);"""
+BRAZ_TO = """    var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.2, 0.3, 7, 1, true), mat(0x3b2a1c, { side: THREE.DoubleSide }));
+    shade.position.y = -0.08;
+    g.add(shade);
+    for (var tri = 0; tri < 3; tri++) {
+      var legA = (tri / 3) * Math.PI * 2;
+      var tleg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.3, 5), mat(0x2b2018));
+      tleg2.position.set(Math.cos(legA) * 0.17, -1.32, Math.sin(legA) * 0.17);
+      tleg2.rotation.set(Math.sin(legA) * 0.09, 0, -Math.cos(legA) * 0.09);
+      g.add(tleg2);
+    }"""
+BRAZ_CORD = """    cord.position.y = 0.75;"""
+BRAZ_CORD_TO = """    cord.visible = false;
+    cord.position.y = 0.75;"""
+BRAZ_POS = """    g.position.set(x, 3.05, -0.1);"""
+BRAZ_POS_TO = """    g.position.set(x * 1.25, 1.62, -1.25);"""
+# the bar's red sign has no place in a palace hall
+NEON_FROM = """  var neon = new THREE.PointLight(0xff4d6a, 0.5, 8, 2);
+  neon.position.set(-4.6, 2.4, -2.2);"""
+NEON_TO = """  var neon = new THREE.PointLight(0xe0762a, 0.5, 9, 2);
+  neon.position.set(-4.3, 1.1, 2.6);"""
 
 
 def cut(src, start_anchor, end_anchor, replacement, what):
@@ -223,6 +252,11 @@ ACTIONS = '''  function fireAction(tag) {
 def main():
     src = io.open(ENGINE, encoding='utf-8').read()
 
+    for _f, _t in ((BRAZ_CORD, BRAZ_CORD_TO), (BRAZ_FROM, BRAZ_TO),
+                   (BRAZ_POS, BRAZ_POS_TO), (NEON_FROM, NEON_TO)):
+        assert src.count(_f) == 1, _f[:40]
+        src = src.replace(_f, _t)
+
     # --- set: bar -> throne room ---------------------------------------
     SET_FROM = '  // floor\n'
     SET_TO = '  // =====================================================================\n  //  CHARACTER RIG'
@@ -305,6 +339,9 @@ def main():
     # render-mode twin: same transform applied to the deterministic variant
     rm_in = os.path.join(ROOT, 'films', 'two-fathers', 'src', 'render-mode.html')
     rm = io.open(rm_in, encoding='utf-8').read()
+    for _f, _t in ((BRAZ_CORD, BRAZ_CORD_TO), (BRAZ_FROM, BRAZ_TO),
+                   (BRAZ_POS, BRAZ_POS_TO), (NEON_FROM, NEON_TO)):
+        rm = rm.replace(_f, _t)
     i = rm.index(SET_FROM)
     j = rm.index(SET_TO, i)
     rm = rm[:i] + SET + '\n' + rm[j:]

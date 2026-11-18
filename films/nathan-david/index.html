@@ -385,11 +385,19 @@
   [-2.6, 0, 2.6].forEach(function (x, i) {
     var g = new THREE.Group();
     var cord = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.5, 4), mat(0x151014));
+    cord.visible = false;
     cord.position.y = 0.75;
     g.add(cord);
-    var shade = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 7, 1, true), mat(0x3a2b22, { side: THREE.DoubleSide }));
+    var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.2, 0.3, 7, 1, true), mat(0x3b2a1c, { side: THREE.DoubleSide }));
     shade.position.y = -0.08;
     g.add(shade);
+    for (var tri = 0; tri < 3; tri++) {
+      var legA = (tri / 3) * Math.PI * 2;
+      var tleg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.3, 5), mat(0x2b2018));
+      tleg2.position.set(Math.cos(legA) * 0.17, -1.32, Math.sin(legA) * 0.17);
+      tleg2.rotation.set(Math.sin(legA) * 0.09, 0, -Math.cos(legA) * 0.09);
+      g.add(tleg2);
+    }
     var bulb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0),
       new THREE.MeshBasicMaterial({ color: 0xffd79a }));
     bulb.position.y = -0.2;
@@ -402,7 +410,7 @@
       pt.shadow.bias = -0.004;
     }
     g.add(pt);
-    g.position.set(x, 3.05, -0.1);
+    g.position.set(x * 1.25, 1.62, -1.25);
     scene.add(g);
     pendants.push({ group: g, light: pt, bulb: bulb, shade: shade, phase: i * 2.1, baseX: x });
   });
@@ -417,8 +425,8 @@
   coldWash.position.set(-5, 3.4, 4.5);
   scene.add(coldWash);
 
-  var neon = new THREE.PointLight(0xff4d6a, 0.5, 8, 2);
-  neon.position.set(-4.6, 2.4, -2.2);
+  var neon = new THREE.PointLight(0xe0762a, 0.5, 9, 2);
+  neon.position.set(-4.3, 1.1, 2.6);
   scene.add(neon);
 
   // =====================================================================
@@ -523,7 +531,7 @@
     tleg.position.set(tl < 2 ? -0.45 : 0.45, 0.26, tl % 2 ? -0.22 : 0.22);
     tableG.add(tleg);
   }
-  tableG.position.set(1.95, 0, 1.05);
+  tableG.position.set(2.75, 0, 1.5);
   tableG.rotation.y = -0.4;
   set.add(tableG);
 
