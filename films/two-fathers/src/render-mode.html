@@ -998,9 +998,9 @@
   var capLine = capEl.querySelector(".line");
   var NAMES = { a: "The Atheist", p: "The Pastor", n: "" };
 
-  // Narration is carried by the voice track alone - only spoken lines get a
-  // subtitle, so the stage directions never appear on screen.
-  function hasCaption(b) { return !!(b && b.text && b.spk !== "n"); }
+  // The film carries itself on voice and picture - nothing is subtitled, so
+  // the frame stays clean. Beats keep their text: it drives timing and lip-sync.
+  function hasCaption(b) { return false; }
 
   function showBeat(i) {
     var b = BEATS[i];
@@ -1561,7 +1561,7 @@
   voice.addEventListener("error", function () {
     // Narration failed: still let the film play. Only dialogue is subtitled,
     // so without the voice track the stage directions are lost - say so.
-    loadingEl.textContent = "Narration unavailable \u2014 playing with dialogue subtitles only";
+    loadingEl.textContent = "Narration unavailable \u2014 the film plays silent";
     playBtn.disabled = false;
     playBtn.style.opacity = "";
   });
