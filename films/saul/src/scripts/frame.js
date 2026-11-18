@@ -22,6 +22,18 @@ function makeFilm(ctx) {
   var subIdx = -1;
 
   var vTmp = new THREE.Vector3(), vLook = new THREE.Vector3();
+  // scratch colours, reused every frame so the loop allocates nothing
+  var cFog = new THREE.Color(), cSky = new THREE.Color();
+  var cSun = new THREE.Color(), cAmbS = new THREE.Color(), cAmbG = new THREE.Color();
+  var curSun = new THREE.Color(MOODS.jerus.sunCol);
+  var curAmbS = new THREE.Color(MOODS.jerus.ambSky);
+  var curAmbG = new THREE.Color(MOODS.jerus.ambGnd);
+  var curFog = new THREE.Color(MOODS.jerus.fogCol);
+
+  // Colour fields are eased in RGB, never as packed hex: lerping 0x3a4258
+  // toward 0xffe6b0 as a NUMBER passes through greens that are in neither
+  // colour. Everything else in a mood is a scalar and eases normally.
+  var COLOR_KEYS = { sunCol: 1, ambSky: 1, ambGnd: 1, fogCol: 1, skyTop: 1 };
 
   // ----------------------------------------------------------- the beat
   function applyBeat(b, i, t) {
@@ -149,22 +161,32 @@ function makeFilm(ctx) {
     solveCamera(t, dt);
 
     // ---- light ----
+    var kMood = 1 - Math.exp(-2.6 * dt);
     for (var k in targetMood) {
+      if (COLOR_KEYS[k]) { mood[k] = targetMood[k]; continue; }
       var cur = mood[k], tg = targetMood[k];
-      if (typeof tg === 'number') {
-        mood[k] = cur + (tg - cur) * (1 - Math.exp(-2.6 * dt));
-      } else {
-        mood[k] = tg;
-      }
+      mood[k] = typeof tg === 'number' ? cur + (tg - cur) * kMood : tg;
     }
+    curSun.lerp(cSun.setHex(mood.sunCol), kMood);
+    curAmbS.lerp(cAmbS.setHex(mood.ambSky), kMood);
+    curAmbG.lerp(cAmbG.setHex(mood.ambGnd), kMood);
+    curFog.lerp(cFog.setHex(mood.fogCol), kMood);
     L.sun.intensity = mood.sun;
-    L.sun.color.setHex(mood.sunCol);
+    L.sun.color.copy(curSun);
     L.amb.intensity = mood.amb;
-    L.amb.color.setHex(mood.ambSky);
-    L.amb.groundColor.setHex(mood.ambGnd);
+    L.amb.color.copy(curAmbS);
+    L.amb.groundColor.copy(curAmbG);
     scene.fog.near = mood.fogN;
     scene.fog.far = mood.fogF;
-    scene.fog.color.setHex(mood.fogCol);
+    scene.fog.color.copy(curFog);
+
+    // The sky meets the fog at the horizon, so the ground plane's edge is
+    // never visible as a seam. Both are eased as colours, not as numbers:
+    // interpolating packed hex would travel through the wrong hues.
+    if (L.skyMat) {
+      L.skyMat.uniforms.bottom.value.copy(curFog);
+      L.skyMat.uniforms.top.value.lerp(cSky.setHex(mood.skyTop), kMood);
+    }
     renderer.toneMappingExposure = mood.exp * (1 - blind * 0.92);
 
     // ---- the holy shaft ----

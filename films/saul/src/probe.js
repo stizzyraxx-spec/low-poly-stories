@@ -1,9 +1,14 @@
+// Grab one representative frame per scene. Times must be ascending: grab()
+// advances the transport forward, so walking the list in order costs one
+// pass through the film instead of one pass per sample.
 const { chromium } = require('playwright');
 const fs=require('fs'), path=require('path');
-const TIMES=[14.0, 25.0, 44.5, 50.0, 60.0, 77.0, 92.0, 113.0, 132.0, 150.0, 165.0, 195.0];
+const TIMES=(process.env.TIMES||'14,25,44.5,50,60,77,92,113,132,150,165,195')
+  .split(',').map(Number);
 (async()=>{
   const b=await chromium.launch({channel:'chrome',args:['--use-gl=angle','--use-angle=swiftshader',
-    '--enable-unsafe-swiftshader','--disable-dev-shm-usage','--no-sandbox','--hide-scrollbars','--force-device-scale-factor=1']});
+    '--enable-unsafe-swiftshader','--disable-dev-shm-usage','--no-sandbox','--hide-scrollbars',
+    '--force-device-scale-factor=1']});
   const p=await b.newPage({viewport:{width:1280,height:720},deviceScaleFactor:1});
   p.on('pageerror',e=>console.log('PAGE ERROR:',e.message));
   await p.goto('file://'+path.resolve('render-mode.html'),{waitUntil:'load'});

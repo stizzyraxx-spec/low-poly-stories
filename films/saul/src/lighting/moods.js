@@ -13,51 +13,51 @@
 var MOODS = {
   // 1 - Jerusalem: warm sandstone, but the key hardens as Saul gives orders
   jerus:     { sun: 2.5, sunCol: 0xffd9a0, amb: 0.95, ambSky: 0xb8c4d8, ambGnd: 0x8a6d4e,
-               fogN: 26, fogF: 110, fogCol: 0xd8c4a4, exp: 1.00, holy: 0, white: 0 },
+               fogN: 26, fogF: 110, fogCol: 0xd8c4a4, exp: 1.00, holy: 0, white: 0, skyTop: 0x8fb4d8 },
   jerusHard: { sun: 2.9, sunCol: 0xffc078, amb: 0.78, ambSky: 0x9aa2b4, ambGnd: 0x7a5a3e,
-               fogN: 22, fogF: 95,  fogCol: 0xcdb08a, exp: 0.97, holy: 0, white: 0 },
+               fogN: 22, fogF: 95,  fogCol: 0xcdb08a, exp: 0.97, holy: 0, white: 0, skyTop: 0x7f97b4 },
 
   // 2 - the road at noon: flat, bright, dusty
   road:      { sun: 3.1, sunCol: 0xfff0cc, amb: 1.05, ambSky: 0xbcd0e8, ambGnd: 0x9c7c58,
-               fogN: 40, fogF: 220, fogCol: 0xd4c0a0, exp: 1.02, holy: 0, white: 0 },
+               fogN: 40, fogF: 220, fogCol: 0xd4c0a0, exp: 1.02, holy: 0, white: 0, skyTop: 0x7fb0e0 },
 
   // 3 - the light. holy rises first, then the frame washes out and HOLDS.
   holyRise:  { sun: 2.4, sunCol: 0xfff2d8, amb: 1.25, ambSky: 0xe8dcc0, ambGnd: 0xc0a480,
-               fogN: 20, fogF: 120, fogCol: 0xe8dcc0, exp: 1.22, holy: 0.55, white: 0.10 },
+               fogN: 20, fogF: 120, fogCol: 0xe8dcc0, exp: 1.22, holy: 0.55, white: 0.10, skyTop: 0xcfd8d0 },
   holyFull:  { sun: 1.4, sunCol: 0xffffff, amb: 1.9,  ambSky: 0xfff6e0, ambGnd: 0xe8d8b8,
-               fogN: 8,  fogF: 54,  fogCol: 0xfff6e0, exp: 1.72, holy: 1.0,  white: 0.44 },
+               fogN: 8,  fogF: 54,  fogCol: 0xfff6e0, exp: 1.72, holy: 1.0,  white: 0.44, skyTop: 0xfff6e0 },
   holyVoice: { sun: 1.1, sunCol: 0xffffff, amb: 2.1,  ambSky: 0xfffaf0, ambGnd: 0xf0e4cc,
-               fogN: 6,  fogF: 44,  fogCol: 0xfffaf0, exp: 1.85, holy: 1.0,  white: 0.56 },
+               fogN: 6,  fogF: 44,  fogCol: 0xfffaf0, exp: 1.85, holy: 1.0,  white: 0.56, skyTop: 0xfffaf0 },
 
   // 4 - blindness: the world drains out. 'blind' drives the subjective fade.
   fade:      { sun: 1.6, sunCol: 0xe8e0d0, amb: 0.85, ambSky: 0x9a96a0, ambGnd: 0x6e6860,
-               fogN: 14, fogF: 70,  fogCol: 0xa8a098, exp: 0.92, holy: 0.2, white: 0 },
+               fogN: 14, fogF: 70,  fogCol: 0xa8a098, exp: 0.92, holy: 0.2, white: 0, skyTop: 0x8a8a92 },
   led:       { sun: 2.2, sunCol: 0xf0dcb8, amb: 0.9,  ambSky: 0xa8b0c0, ambGnd: 0x8a7458,
-               fogN: 24, fogF: 120, fogCol: 0xc4b498, exp: 0.95, holy: 0, white: 0 },
+               fogN: 24, fogF: 120, fogCol: 0xc4b498, exp: 0.95, holy: 0, white: 0, skyTop: 0x90a8c4 },
 
   // 5 - three days: lamplight only, the room nearly dark
   dark:      { sun: 0.12, sunCol: 0x6a7a9a, amb: 0.30, ambSky: 0x3a4258, ambGnd: 0x241c14,
-               fogN: 9,  fogF: 30,  fogCol: 0x2a2420, exp: 0.84, holy: 0, white: 0 },
+               fogN: 9,  fogF: 30,  fogCol: 0x2a2420, exp: 0.84, holy: 0, white: 0, skyTop: 0x1a2030 },
   darkNight: { sun: 0.04, sunCol: 0x4a5a80, amb: 0.20, ambSky: 0x242c42, ambGnd: 0x18120e,
-               fogN: 7,  fogF: 24,  fogCol: 0x1c1814, exp: 0.78, holy: 0, white: 0 },
+               fogN: 7,  fogF: 24,  fogCol: 0x1c1814, exp: 0.78, holy: 0, white: 0, skyTop: 0x121826 },
 
   // 6 - the vision: soft gold fills a dark room
   vision:    { sun: 0.5, sunCol: 0xffd090, amb: 0.75, ambSky: 0xffdca0, ambGnd: 0x6a4e30,
-               fogN: 10, fogF: 38,  fogCol: 0x6a5436, exp: 1.06, holy: 0.42, white: 0.05 },
+               fogN: 10, fogF: 38,  fogCol: 0x6a5436, exp: 1.06, holy: 0.42, white: 0.05, skyTop: 0x2a2438 },
 
   // 7 - sight restored: cold room warming as the scales fall
   roomCold:  { sun: 0.7, sunCol: 0xa8b4c8, amb: 0.52, ambSky: 0x6a7490, ambGnd: 0x3a3228,
-               fogN: 11, fogF: 40,  fogCol: 0x4a4440, exp: 0.90, holy: 0, white: 0 },
+               fogN: 11, fogF: 40,  fogCol: 0x4a4440, exp: 0.90, holy: 0, white: 0, skyTop: 0x4a5468 },
   roomWarm:  { sun: 1.9, sunCol: 0xffd9a0, amb: 0.92, ambSky: 0xd8c0a0, ambGnd: 0x7a5e40,
-               fogN: 16, fogF: 62,  fogCol: 0xc4a888, exp: 1.06, holy: 0.22, white: 0.04 },
+               fogN: 16, fogF: 62,  fogCol: 0xc4a888, exp: 1.06, holy: 0.22, white: 0.04, skyTop: 0x9a8468 },
 
   // 8 - preaching in open daylight
   court:     { sun: 3.2, sunCol: 0xfff2d0, amb: 1.12, ambSky: 0xc4d8f0, ambGnd: 0xa88868,
-               fogN: 44, fogF: 200, fogCol: 0xd8c8a8, exp: 1.03, holy: 0, white: 0 },
+               fogN: 44, fogF: 200, fogCol: 0xd8c8a8, exp: 1.03, holy: 0, white: 0, skyTop: 0x8cc0ea },
 
   // 9 - sunrise on the road out
   sunrise:   { sun: 2.6, sunCol: 0xffb870, amb: 1.0, ambSky: 0xf0b088, ambGnd: 0x9a7050,
-               fogN: 30, fogF: 170, fogCol: 0xe8b890, exp: 1.10, holy: 0.12, white: 0 }
+               fogN: 30, fogF: 170, fogCol: 0xe8b890, exp: 1.10, holy: 0.12, white: 0, skyTop: 0xf0a070 }
 };
 
 // Build the light rig. Returns the handles the frame loop drives.
@@ -98,8 +98,35 @@ function buildLights(scene) {
 
   scene.fog = new THREE.Fog(0xd8c4a4, 26, 110);
 
+  // A skydome, not a background colour: the aerial shots look out past the
+  // edge of the ground plane, so without geometry up there the frame shows
+  // the clear colour as a hard black band. The dome takes the fog colour at
+  // the horizon and a deeper tint overhead, which also hides the seam where
+  // the ground plane ends.
+  var skyGeo = new THREE.SphereGeometry(320, 18, 12);
+  var skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      top: { value: new THREE.Color(0x8fb4d8) },
+      bottom: { value: new THREE.Color(0xd8c4a4) }
+    },
+    vertexShader:
+      'varying float h;\n' +
+      'void main(){ vec4 w = modelMatrix * vec4(position,1.0);' +
+      ' h = normalize(w.xyz).y;' +
+      ' gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader:
+      'uniform vec3 top; uniform vec3 bottom; varying float h;\n' +
+      'void main(){ float m = clamp(h*1.5+0.18, 0.0, 1.0);' +
+      ' m = m*m*(3.0-2.0*m);' +
+      ' gl_FragColor = vec4(mix(bottom, top, m), 1.0); }'
+  });
+  var sky = new THREE.Mesh(skyGeo, skyMat);
+  sky.renderOrder = -1;
+  scene.add(sky);
+
   return { amb: amb, sun: sun, holy: holy, holySpot: holySpot,
-           lampA: lampA, lampB: lampB };
+           lampA: lampA, lampB: lampB, sky: sky, skyMat: skyMat };
 }
 
 // The volumetric shaft: nested cones of additive haze. Cheap, and it reads as
