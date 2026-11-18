@@ -366,7 +366,14 @@ def main():
     src = src.replace('speaking && b.spk === "p" ? 1 : 0', 'speaking && b.spk === "d" ? 1 : 0')
 
     # --- narration ------------------------------------------------------
-    mp3 = io.open(os.path.join(HERE, 'narration.mp3'), 'rb').read()
+    mp3_path = os.path.join(HERE, 'narration.mp3')
+    if not os.path.exists(mp3_path):
+        raise SystemExit(
+            'narration.mp3 is missing. See NARRATION-README.md: the only\n'
+            'recording on hand narrates Job, not Nathan and David, and the\n'
+            'beats are still timed to it. Supply the real narration and\n'
+            're-run the alignment before building.')
+    mp3 = io.open(mp3_path, 'rb').read()
     b64 = base64.b64encode(mp3).decode('ascii')
     i = src.index('  var AUDIO_SRC = "data:audio/mpeg;base64,')
     j = src.index('";\n', i) + len('";\n')
