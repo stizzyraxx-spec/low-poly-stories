@@ -242,6 +242,8 @@ MAIN = r'''
         if (fr.containsPoint(cv)) nCrowd++;
       }
       out.crowdInFrustum = nCrowd;
+      out.activeCam = window.__activeCam || null;
+      out.scene = window.__curScene || null;
       return out;
     };
     window.__filmReady = true;

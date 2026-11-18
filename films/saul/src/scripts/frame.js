@@ -43,6 +43,8 @@ function makeFilm(ctx) {
       curScene = b.sc;
     }
     cutTo(SHOTS[b.cam], b.t, b.d, b.cam === "jAerial" ? 0 : 0.5);
+    window.__activeCam = b.cam;
+    window.__curScene = b.sc;
     targetMood = MOODS[b.mood];
     speaker = C[b.who] || null;
     speakStart = b.t;
@@ -128,6 +130,7 @@ function makeFilm(ctx) {
       // camera was hSaulCU, a scene-7 room shot, with scene 8 staged.
       if (SUBCUTS[s].sc !== undefined && SUBCUTS[s].sc !== curScene) continue;
       cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
+      window.__activeCam = SUBCUTS[s].cam;
     }
 
     var now = sampleShot(curShot, t);

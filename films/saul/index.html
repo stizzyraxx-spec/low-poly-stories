@@ -1363,9 +1363,13 @@ function buildShots(C) {
 
   // ---- 8: preaching ----
   S.pWide     = wideOn(C.saul, { yaw: 0.1, dist: 14.00, height: 3.1, lookY: 1.7, fov: 42 });
-  S.pSaul     = wideOn(C.saul, { yaw: 0.2, dist: 5.25, height: 2.0, lookY: 1.65, fov: 32 });
-  S.pSaulCU   = cu(C.saul, { dist: 4.3, yaw: 0.2, fov: 24 });
-  S.pSaulHero = hero(C.saul, { dist: 5.2, height: 1.0, fov: 34 });
+  // Saul preaches from the steps at z=-5.4 with the crowd spread across
+  // z=-1.4..+2.7. Any camera closer than ~9 units lands INSIDE the audience
+  // and shoots away from it, so he appears to address an empty courtyard.
+  // These three clear the back row; pGrow at 18 already did.
+  S.pSaul     = wideOn(C.saul, { yaw: 0.16, dist: 10.5, height: 2.6, lookY: 1.6, fov: 34 });
+  S.pSaulCU   = cu(C.saul, { dist: 9.5, yaw: 0.14, fov: 15 });
+  S.pSaulHero = hero(C.saul, { dist: 9.8, height: 1.3, yaw: 0.1, fov: 20 });
   S.pCrowdA   = cu(C.citA, { dist: 2.80, yaw: 0.3, fov: 28 });
   S.pCrowdB   = cu(C.citB, { dist: 2.80, yaw: -0.3, fov: 28 });
   // From behind the audience, over a listener's shoulder, to Saul on the
@@ -2180,6 +2184,8 @@ function makeFilm(ctx) {
       curScene = b.sc;
     }
     cutTo(SHOTS[b.cam], b.t, b.d, b.cam === "jAerial" ? 0 : 0.5);
+    window.__activeCam = b.cam;
+    window.__curScene = b.sc;
     targetMood = MOODS[b.mood];
     speaker = C[b.who] || null;
     speakStart = b.t;
@@ -2265,6 +2271,7 @@ function makeFilm(ctx) {
       // camera was hSaulCU, a scene-7 room shot, with scene 8 staged.
       if (SUBCUTS[s].sc !== undefined && SUBCUTS[s].sc !== curScene) continue;
       cutTo(SHOTS[SUBCUTS[s].cam], SUBCUTS[s].t, 3.2, 0.42);
+      window.__activeCam = SUBCUTS[s].cam;
     }
 
     var now = sampleShot(curShot, t);
@@ -2604,6 +2611,8 @@ function makeFilm(ctx) {
         if (fr.containsPoint(cv)) nCrowd++;
       }
       out.crowdInFrustum = nCrowd;
+      out.activeCam = window.__activeCam || null;
+      out.scene = window.__curScene || null;
       return out;
     };
     window.__filmReady = true;
